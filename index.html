@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ValGo CRM — Gestion Flotte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --primary: #1D5C3B;
+  --primary-light: #2a7a50;
+  --primary-dark: #154a2f;
+  --bg: #ffffff;
+  --bg-card: #f8f9fa;
+  --bg-sidebar: #111111;
+  --text: #1a1a1a;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --danger: #dc2626;
+  --warning: #f59e0b;
+  --success: #16a34a;
+  --info: #3b82f6;
+}
+[data-theme="dark"] {
+  --bg: #111111;
+  --bg-card: #1a1a1a;
+  --text: #f0f0f0;
+  --text-muted: #9ca3af;
+  --border: #2a2a2a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  background: var(--bg-sidebar);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+  transition: transform 0.3s;
+}
+.sidebar-logo {
+  padding: 24px 20px;
+  border-bottom: 1px solid #222;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sidebar-logo .logo-icon {
+  width: 36px; height: 36px;
+  background: var(--primary);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 16px;
+}
+.sidebar-logo span { font-size: 20px; font-weight: 700; }
+.sidebar-nav { flex: 1; padding: 16px 0; }
+.sidebar-nav a {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 20px;
+  color: #aaa;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.sidebar-nav a:hover, .sidebar-nav a.active {
+  color: #fff;
+  background: rgba(29,92,59,0.3);
+  border-right: 3px solid var(--primary);
+}
+.sidebar-nav a svg { width: 20px; height: 20px; flex-shrink: 0; }
+.sidebar-bottom {
+  padding: 16px 20px;
+  border-top: 1px solid #222;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sidebar-bottom button {
+  background: none; border: 1px solid #333;
+  color: #aaa; padding: 8px 12px;
+  border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-family: inherit;
+  display: flex; align-items: center; gap: 8px;
+  transition: all 0.2s;
+}
+.sidebar-bottom button:hover { color: #fff; border-color: #555; }
+/* Main */
+.main {
+  margin-left: 240px;
+  flex: 1;
+  padding: 32px;
+  max-width: 1200px;
+}
+.page { display: none; }
+.page.active { display: block; }
+/* Header */
+.page-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 24px;
+}
+.page-header h1 { font-size: 24px; font-weight: 700; }
+/* KPI Cards */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.kpi-card .kpi-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.kpi-card .kpi-value { font-size: 28px; font-weight: 700; }
+.kpi-card .kpi-value.green { color: var(--success); }
+.kpi-card .kpi-value.red { color: var(--danger); }
+/* Vehicle Cards */
+.vehicle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.vehicle-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.vehicle-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.vehicle-card-img {
+  height: 160px;
+  background: #ddd;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+.vehicle-card-img .status-badge {
+  position: absolute;
+  top: 12px; right: 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.status-badge.actif { background: #dcfce7; color: #166534; }
+.status-badge.entretien { background: #fef3c7; color: #92400e; }
+.status-badge.hors-service { background: #fecaca; color: #991b1b; }
+[data-theme="dark"] .status-badge.actif { background: #14532d; color: #86efac; }
+[data-theme="dark"] .status-badge.entretien { background: #78350f; color: #fcd34d; }
+[data-theme="dark"] .status-badge.hors-service { background: #7f1d1d; color: #fca5a5; }
+.vehicle-card-body { padding: 16px; }
+.vehicle-card-body h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.vehicle-card-body .immat { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+.vehicle-card-body .meta { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); }
+/* Alerts */
+.alerts-section h2 { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+.alert-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.alert-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.alert-dot.red { background: var(--danger); }
+.alert-dot.orange { background: var(--warning); }
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-light); }
+.btn-secondary { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { opacity: 0.9; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th, td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+/* Forms */
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+}
+.form-group textarea { resize: vertical; min-height: 60px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* Tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+.tab {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+/* Modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.modal h2 { font-size: 18px; margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+/* Kanban */
+.kanban-board {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 16px;
+}
+.kanban-col {
+  min-width: 240px;
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.kanban-col-header {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.kanban-col-header .count {
+  background: var(--border);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.kanban-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: grab;
+  transition: box-shadow 0.2s;
+}
+.kanban-card:active { cursor: grabbing; }
+.kanban-card.dragging { opacity: 0.5; }
+.kanban-card h4 { font-size: 14px; margin-bottom: 4px; }
+.kanban-card .meta { font-size: 12px; color: var(--text-muted); }
+.kanban-card .price { font-weight: 600; color: var(--primary); }
+.kanban-card .score-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+/* Checklist */
+.checklist-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.checklist-section h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+}
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.checklist-item:last-child { border-bottom: none; }
+.checklist-item input[type="checkbox"] {
+  width: 18px; height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.checklist-item.checked label { text-decoration: line-through; color: var(--text-muted); }
+.score-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+.score-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+.score-display {
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+  margin: 16px 0;
+}
+/* Chart container */
+.chart-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+/* Back link */
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--text-muted);
+  text-decoration: none; cursor: pointer;
+  margin-bottom: 16px;
+}
+.back-link:hover { color: var(--text); }
+/* Saved checklists */
+.saved-list { margin-bottom: 16px; }
+.saved-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.saved-item:hover { border-color: var(--primary); }
+.saved-item .score { font-weight: 600; color: var(--primary); }
+/* Responsive */
+.mobile-toggle {
+  display: none;
+  position: fixed;
+  top: 12px; left: 12px;
+  z-index: 150;
+  background: var(--bg-sidebar);
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+}
+@media (max-width: 768px) {
+  .mobile-toggle { display: block; }
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .main { margin-left: 0; padding: 16px; padding-top: 56px; }
+  .form-row { grid-template-columns: 1fr; }
+  .kanban-board { flex-direction: column; }
+  .kanban-col { min-width: unset; }
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+  .vehicle-grid { grid-template-columns: 1fr; }
+}
+/* Print */
+@media print {
+  .sidebar, .mobile-toggle, .btn, .sidebar-bottom, .tabs { display: none !important; }
+  .main { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+
+<button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">V</div>
+    <span>ValGo</span>
+  </div>
+  <div class="sidebar-nav">
+    <a onclick="navigate('dashboard')" class="active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+    <a onclick="navigate('vehicles')" data-page="vehicles">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14M5 17a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2M5 17l-1 3h16l-1-3"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>
+      Vehicules
+    </a>
+    <a onclick="navigate('checklist')" data-page="checklist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Checklist Pre-Achat
+    </a>
+    <a onclick="navigate('pipeline')" data-page="pipeline">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Pipeline
+    </a>
+  </div>
+  <div class="sidebar-bottom">
+    <button onclick="toggleTheme()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      Theme sombre
+    </button>
+    <button onclick="exportData()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export JSON
+    </button>
+    <button onclick="document.getElementById('importInput').click()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Import JSON
+    </button>
+    <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+</nav>
+
+<!-- ========== DASHBOARD ========== -->
+<div class="main">
+<div id="page-dashboard" class="page active">
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <button class="btn btn-primary" onclick="openAddVehicle()">+ Ajouter un vehicule</button>
+  </div>
+  <div class="kpi-row" id="dashboard-kpis"></div>
+  <h2 style="font-size:18px;font-weight:600;margin-bottom:12px;">Flotte</h2>
+  <div class="vehicle-grid" id="dashboard-vehicles"></div>
+  <div class="alerts-section">
+    <h2>Alertes</h2>
+    <div id="dashboard-alerts"></div>
+  </div>
+</div>
+
+<!-- ========== VEHICLES LIST ========== -->
+<div id="page-vehicles" class="page">
+  <div class="page-header">
+    <h1>Vehicules</h1>
+    <button class="btn btn-primary" onclick="openAddVehicle()">+ Ajouter un vehicule</button>
+  </div>
+  <div class="vehicle-grid" id="vehicles-grid"></div>
+</div>
+
+<!-- ========== VEHICLE DETAIL ========== -->
+<div id="page-vehicle-detail" class="page">
+  <a class="back-link" onclick="navigate('vehicles')">&larr; Retour aux vehicules</a>
+  <div id="vehicle-detail-header" style="display:flex;gap:20px;align-items:center;margin-bottom:20px;">
+    <div id="vehicle-detail-img" style="width:120px;height:80px;background:#ddd;border-radius:8px;background-size:cover;background-position:center;flex-shrink:0;"></div>
+    <div>
+      <h1 id="vehicle-detail-title" style="font-size:22px;"></h1>
+      <p id="vehicle-detail-immat" style="color:var(--text-muted);font-size:14px;"></p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="openEditVehicle()">Modifier</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCurrentVehicle()">Supprimer</button>
+    </div>
+  </div>
+  <div class="tabs" id="vehicle-tabs">
+    <button class="tab active" onclick="switchVehicleTab('info')">Infos generales</button>
+    <button class="tab" onclick="switchVehicleTab('entretien')">Suivi entretien</button>
+    <button class="tab" onclick="switchVehicleTab('financier')">Suivi financier</button>
+  </div>
+  <div id="vtab-info" class="tab-content active"></div>
+  <div id="vtab-entretien" class="tab-content"></div>
+  <div id="vtab-financier" class="tab-content"></div>
+</div>
+
+<!-- ========== CHECKLIST ========== -->
+<div id="page-checklist" class="page">
+  <div class="page-header">
+    <h1>Checklist Pre-Achat</h1>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" onclick="newChecklist()">Nouveau dossier</button>
+    </div>
+  </div>
+  <div id="checklist-saved-list" class="saved-list"></div>
+  <div id="checklist-editor" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <input id="checklist-name" type="text" placeholder="Nom du dossier (ex: Yaris 92000km)" style="font-size:18px;font-weight:600;border:none;background:none;color:var(--text);outline:none;width:60%;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="saveChecklist()">Sauvegarder</button>
+        <button class="btn btn-secondary btn-sm" onclick="printChecklist()">Imprimer / PDF</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeChecklist()">Fermer</button>
+      </div>
+    </div>
+    <div class="score-display" id="checklist-score">0%</div>
+    <div class="score-bar"><div class="score-bar-fill" id="checklist-score-bar" style="width:0%"></div></div>
+    <div id="checklist-sections"></div>
+  </div>
+</div>
+
+<!-- ========== PIPELINE ========== -->
+<div id="page-pipeline" class="page">
+  <div class="page-header">
+    <h1>Pipeline Acquisitions</h1>
+    <button class="btn btn-primary" onclick="openAddPipelineCard()">+ Ajouter</button>
+  </div>
+  <div class="kanban-board" id="kanban-board"></div>
+</div>
+</div><!-- /main -->
+
+<!-- ========== MODALS ========== -->
+<div class="modal-overlay" id="modal-vehicle">
+  <div class="modal">
+    <h2 id="modal-vehicle-title">Ajouter un vehicule</h2>
+    <form id="vehicle-form" onsubmit="saveVehicle(event)">
+      <input type="hidden" id="vf-id">
+      <div class="form-row">
+        <div class="form-group"><label>Marque</label><input id="vf-marque" required></div>
+        <div class="form-group"><label>Modele</label><input id="vf-modele" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Annee</label><input id="vf-annee" type="number"></div>
+        <div class="form-group"><label>Motorisation</label><input id="vf-moteur" placeholder="ex: 1.2 Fire 69ch"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Immatriculation</label><input id="vf-immat" required></div>
+        <div class="form-group">
+          <label>Statut</label>
+          <select id="vf-statut">
+            <option value="actif">Actif</option>
+            <option value="entretien">En entretien</option>
+            <option value="hors-service">Hors service</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Km achat</label><input id="vf-km-achat" type="number"></div>
+        <div class="form-group"><label>Km actuel</label><input id="vf-km-actuel" type="number"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Date d'achat</label><input id="vf-date-achat" type="date"></div>
+        <div class="form-group"><label>Prix d'achat (EUR)</label><input id="vf-prix-achat" type="number"></div>
+      </div>
+      <div class="form-group"><label>Localisation</label><input id="vf-localisation" placeholder="ex: Gardanne"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Lien Getaround</label><input id="vf-lien-getaround" type="url"></div>
+        <div class="form-group"><label>Lien Histovec</label><input id="vf-lien-histovec" type="url"></div>
+      </div>
+      <div class="form-group"><label>Lien Autoviza</label><input id="vf-lien-autoviza" type="url"></div>
+      <div class="form-group">
+        <label>Statut Connect</label>
+        <select id="vf-connect">
+          <option value="actif">Actif</option>
+          <option value="inactif">Inactif</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Photo du vehicule</label>
+        <input type="file" id="vf-photo" accept="image/*" onchange="handlePhotoUpload(event)">
+        <div id="vf-photo-preview" style="margin-top:8px;"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-vehicle')">Annuler</button>
+        <button type="submit" class="btn btn-primary">Sauvegarder</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-entretien">
+  <div class="modal">
+    <h2 id="modal-entretien-title">Ajouter un entretien</h2>
+    <form id="entretien-form" onsubmit="saveEntretien(event)">
+      <input type="hidden" id="ef-id">
+      <div class="form-group">
+        <label>Type d'entretien</label>
+        <select id="ef-type">
+          <option>Pneus</option><option>Essuie-glaces</option><option>Courroie de distribution</option>
+          <option>Vidange</option><option>Freins</option><option>Filtres</option>
+          <option>CT</option><option>Embrayage</option><option>Courroie accessoires</option>
+          <option>Autre</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Statut</label>
+        <select id="ef-statut">
+          <option value="a_prevoir">A prevoir</option>
+          <option value="fait">Fait</option>
+          <option value="urgent">Urgent</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Date</label><input id="ef-date" type="date"></div>
+        <div class="form-group"><label>Km</label><input id="ef-km" type="number"></div>
+      </div>
+      <div class="form-group"><label>Prix (EUR)</label><input id="ef-prix" type="number" step="0.01"></div>
+      <div class="form-group"><label>Notes</label><textarea id="ef-notes"></textarea></div>
+      <div class="form-group">
+        <label>Document (PDF)</label>
+        <input type="file" id="ef-doc" accept=".pdf" onchange="handleDocUpload(event)">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-entretien')">Annuler</button>
+        <button type="submit" class="btn btn-primary">Sauvegarder</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-financier">
+  <div class="modal">
+    <h2>Ajouter / Modifier mois</h2>
+    <form id="financier-form" onsubmit="saveFinancier(event)">
+      <input type="hidden" id="ff-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Mois</label>
+          <select id="ff-mois">
+            <option value="01">Janvier</option><option value="02">Fevrier</option><option value="03">Mars</option>
+            <option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option>
+            <option value="07">Juillet</option><option value="08">Aout</option><option value="09">Septembre</option>
+            <option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Decembre</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Annee</label><input id="ff-annee" type="number" value="2026"></div>
+      </div>
+      <div class="form-group"><label>Revenus Getaround bruts (EUR)</label><input id="ff-revenus" type="number" step="0.01" value="0"></div>
+      <div class="form-group"><label>Jours loues</label><input id="ff-jours" type="number" value="0"></div>
+      <div class="form-group"><label>Depenses entretien (EUR)</label><input id="ff-dep-entretien" type="number" step="0.01" value="0"></div>
+      <div class="form-group"><label>Assurance (EUR)</label><input id="ff-assurance" type="number" step="0.01" value="0"></div>
+      <div class="form-group"><label>Abonnement Connect (EUR)</label><input id="ff-connect" type="number" step="0.01" value="0"></div>
+      <div class="form-group"><label>Stationnement (EUR)</label><input id="ff-parking" type="number" step="0.01" value="0"></div>
+      <div class="form-group"><label>Autres depenses (EUR)</label><input id="ff-autres" type="number" step="0.01" value="0"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-financier')">Annuler</button>
+        <button type="submit" class="btn btn-primary">Sauvegarder</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-pipeline">
+  <div class="modal">
+    <h2 id="modal-pipeline-title">Ajouter un vehicule au pipeline</h2>
+    <form id="pipeline-form" onsubmit="savePipelineCard(event)">
+      <input type="hidden" id="pf-id">
+      <div class="form-group"><label>Modele</label><input id="pf-modele" required placeholder="ex: Toyota Yaris 2018"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Km</label><input id="pf-km" type="number"></div>
+        <div class="form-group"><label>Prix annonce (EUR)</label><input id="pf-prix" type="number"></div>
+      </div>
+      <div class="form-group"><label>Prix cible (EUR)</label><input id="pf-prix-cible" type="number"></div>
+      <div class="form-group"><label>Lien annonce</label><input id="pf-lien" type="url"></div>
+      <div class="form-group">
+        <label>Etape</label>
+        <select id="pf-etape">
+          <option value="repere">Repere</option>
+          <option value="m1_envoye">M1 envoye</option>
+          <option value="en_discussion">En discussion</option>
+          <option value="visite_planifiee">Visite planifiee</option>
+          <option value="achete">Achete</option>
+          <option value="abandonne">Abandonne</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Score prix (1-5)</label>
+          <input id="pf-score-prix" type="number" min="1" max="5" value="3">
+        </div>
+        <div class="form-group">
+          <label>Score km (1-5)</label>
+          <input id="pf-score-km" type="number" min="1" max="5" value="3">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Score historique (1-5)</label>
+          <input id="pf-score-histo" type="number" min="1" max="5" value="3">
+        </div>
+        <div class="form-group">
+          <label>Score moteur (1-5)</label>
+          <input id="pf-score-moteur" type="number" min="1" max="5" value="3">
+        </div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="pf-notes"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-pipeline')">Annuler</button>
+        <button type="submit" class="btn btn-primary">Sauvegarder</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ====== DATA LAYER ======
+const STORAGE_KEY = 'valgo_crm';
+let DATA = loadData();
+
+function defaultData() {
+  return {
+    vehicles: [{
+      id: 'v1',
+      marque: 'Fiat',
+      modele: '500 Lounge',
+      annee: 2015,
+      moteur: '1.2 Fire 69ch',
+      immat: 'DN499LM',
+      statut: 'actif',
+      kmAchat: null,
+      kmActuel: null,
+      dateAchat: null,
+      prixAchat: null,
+      localisation: 'Gardanne',
+      lienGetaround: '',
+      lienHistovec: '',
+      lienAutoviza: '',
+      connect: 'actif',
+      photo: '',
+      entretiens: defaultEntretiens(),
+      financier: []
+    }],
+    checklists: [],
+    pipeline: []
+  };
+}
+
+function defaultEntretiens() {
+  const types = ['Pneus','Essuie-glaces','Courroie de distribution','Vidange','Freins','Filtres','CT','Embrayage','Courroie accessoires'];
+  return types.map((t, i) => ({
+    id: 'e' + i,
+    type: t,
+    statut: 'a_prevoir',
+    date: '',
+    km: null,
+    prix: null,
+    notes: '',
+    doc: ''
+  }));
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return defaultData();
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+}
+
+function genId() { return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+
+// ====== NAVIGATION ======
+let currentVehicleId = null;
+let currentChecklistId = null;
+let financierChart = null;
+
+function navigate(page, extra) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+  const el = document.querySelector(`[data-page="${page}"]`);
+  if (el) el.classList.add('active');
+  document.querySelector('.sidebar').classList.remove('open');
+
+  if (page === 'dashboard') {
+    document.getElementById('page-dashboard').classList.add('active');
+    renderDashboard();
+  } else if (page === 'vehicles') {
+    document.getElementById('page-vehicles').classList.add('active');
+    renderVehiclesList();
+  } else if (page === 'vehicle-detail') {
+    document.getElementById('page-vehicle-detail').classList.add('active');
+    document.querySelector('[data-page="vehicles"]').classList.add('active');
+    currentVehicleId = extra;
+    renderVehicleDetail();
+  } else if (page === 'checklist') {
+    document.getElementById('page-checklist').classList.add('active');
+    renderChecklistPage();
+  } else if (page === 'pipeline') {
+    document.getElementById('page-pipeline').classList.add('active');
+    renderPipeline();
+  }
+}
+
+// ====== DASHBOARD ======
+function renderDashboard() {
+  const now = new Date();
+  const curMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const curYear = now.getFullYear();
+  let totalRevenu = 0, totalDepenses = 0, totalEntretienDep = 0, joursLoues = 0, joursTotal = 0;
+
+  DATA.vehicles.forEach(v => {
+    (v.financier || []).forEach(f => {
+      if (f.annee == curYear && f.mois === curMonth) {
+        const rev = parseFloat(f.revenus) || 0;
+        const commission = rev * 0.1;
+        const depEnt = parseFloat(f.depEntretien) || 0;
+        const depFixes = (parseFloat(f.assurance)||0) + (parseFloat(f.connect)||0) + (parseFloat(f.parking)||0) + (parseFloat(f.autres)||0);
+        totalRevenu += rev;
+        totalDepenses += commission + depEnt + depFixes;
+        totalEntretienDep += depEnt;
+        joursLoues += parseInt(f.jours) || 0;
+      }
+    });
+    joursTotal += new Date(curYear, parseInt(curMonth), 0).getDate();
+  });
+
+  const net = totalRevenu - totalDepenses;
+  const taux = joursTotal > 0 ? Math.round((joursLoues / joursTotal) * 100) : 0;
+
+  document.getElementById('dashboard-kpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Revenus du mois</div><div class="kpi-value">${totalRevenu.toFixed(0)} EUR</div></div>
+    <div class="kpi-card"><div class="kpi-label">Taux d'occupation</div><div class="kpi-value">${taux}%</div></div>
+    <div class="kpi-card"><div class="kpi-label">Depenses entretien</div><div class="kpi-value">${totalEntretienDep.toFixed(0)} EUR</div></div>
+    <div class="kpi-card"><div class="kpi-label">Benefice net</div><div class="kpi-value ${net >= 0 ? 'green' : 'red'}">${net >= 0 ? '+' : ''}${net.toFixed(0)} EUR</div></div>
+  `;
+
+  document.getElementById('dashboard-vehicles').innerHTML = DATA.vehicles.map(v => vehicleCardHTML(v)).join('');
+
+  // Alerts
+  const alerts = [];
+  DATA.vehicles.forEach(v => {
+    (v.entretiens || []).forEach(e => {
+      if (e.statut === 'urgent') alerts.push({ color: 'red', text: `${v.marque} ${v.modele} — ${e.type} : URGENT` });
+      else if (e.statut === 'a_prevoir') alerts.push({ color: 'orange', text: `${v.marque} ${v.modele} — ${e.type} : A prevoir` });
+    });
+  });
+  document.getElementById('dashboard-alerts').innerHTML = alerts.length === 0
+    ? '<p style="color:var(--text-muted);font-size:14px;">Aucune alerte active</p>'
+    : alerts.map(a => `<div class="alert-item"><div class="alert-dot ${a.color}"></div>${a.text}</div>`).join('');
+}
+
+function vehicleCardHTML(v) {
+  const imgStyle = v.photo ? `background-image:url(${v.photo})` : 'display:flex;align-items:center;justify-content:center;font-size:40px;color:#999;';
+  const imgContent = v.photo ? '' : '&#128663;';
+  return `
+    <div class="vehicle-card" onclick="navigate('vehicle-detail','${v.id}')">
+      <div class="vehicle-card-img" style="${imgStyle}">${imgContent}
+        <span class="status-badge ${v.statut}">${v.statut === 'actif' ? 'Actif' : v.statut === 'entretien' ? 'Entretien' : 'Hors service'}</span>
+      </div>
+      <div class="vehicle-card-body">
+        <h3>${v.marque} ${v.modele}</h3>
+        <div class="immat">${v.immat}${v.annee ? ' — ' + v.annee : ''}</div>
+        <div class="meta">
+          ${v.kmActuel ? '<span>' + v.kmActuel.toLocaleString() + ' km</span>' : ''}
+          ${v.localisation ? '<span>' + v.localisation + '</span>' : ''}
+          <span>Connect: ${v.connect}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ====== VEHICLES LIST ======
+function renderVehiclesList() {
+  document.getElementById('vehicles-grid').innerHTML = DATA.vehicles.map(v => vehicleCardHTML(v)).join('');
+}
+
+// ====== VEHICLE DETAIL ======
+function renderVehicleDetail() {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  if (!v) return navigate('vehicles');
+
+  document.getElementById('vehicle-detail-title').textContent = `${v.marque} ${v.modele}`;
+  document.getElementById('vehicle-detail-immat').textContent = `${v.immat}${v.annee ? ' — ' + v.annee : ''}${v.moteur ? ' — ' + v.moteur : ''}`;
+  const imgEl = document.getElementById('vehicle-detail-img');
+  if (v.photo) {
+    imgEl.style.backgroundImage = `url(${v.photo})`;
+    imgEl.innerHTML = '';
+  } else {
+    imgEl.style.backgroundImage = '';
+    imgEl.innerHTML = '<span style="font-size:32px;">&#128663;</span>';
+    imgEl.style.display = 'flex';
+    imgEl.style.alignItems = 'center';
+    imgEl.style.justifyContent = 'center';
+  }
+
+  switchVehicleTab('info');
+}
+
+function switchVehicleTab(tab) {
+  document.querySelectorAll('#vehicle-tabs .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelector(`#vehicle-tabs .tab:nth-child(${tab === 'info' ? 1 : tab === 'entretien' ? 2 : 3})`).classList.add('active');
+  document.getElementById(`vtab-${tab}`).classList.add('active');
+
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  if (!v) return;
+
+  if (tab === 'info') renderVehicleInfo(v);
+  else if (tab === 'entretien') renderVehicleEntretien(v);
+  else if (tab === 'financier') renderVehicleFinancier(v);
+}
+
+function renderVehicleInfo(v) {
+  const link = (url, label) => url ? `<a href="${url}" target="_blank" style="color:var(--primary);text-decoration:none;">${label}</a>` : '<span style="color:var(--text-muted);">—</span>';
+  document.getElementById('vtab-info').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Marque / Modele</label><p>${v.marque} ${v.modele}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Annee</label><p>${v.annee || '—'}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Motorisation</label><p>${v.moteur || '—'}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Immatriculation</label><p style="font-weight:600;">${v.immat}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Km achat</label><p>${v.kmAchat ? v.kmAchat.toLocaleString() + ' km' : '—'}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Km actuel</label><p>${v.kmActuel ? v.kmActuel.toLocaleString() + ' km' : '—'}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Date d'achat</label><p>${v.dateAchat || '—'}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Prix d'achat</label><p>${v.prixAchat ? v.prixAchat.toLocaleString() + ' EUR' : '—'}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Localisation</label><p>${v.localisation || '—'}</p></div>
+      <div class="form-group"><label style="color:var(--text-muted);font-size:12px;">Statut Connect</label><p>${v.connect === 'actif' ? '<span style="color:var(--success);font-weight:600;">Actif</span>' : 'Inactif'}</p></div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:24px;">
+      <div>${link(v.lienGetaround, 'Getaround')}</div>
+      <div>${link(v.lienHistovec, 'Histovec')}</div>
+      <div>${link(v.lienAutoviza, 'Autoviza')}</div>
+    </div>
+  `;
+}
+
+function renderVehicleEntretien(v) {
+  const statusBadge = (s) => {
+    if (s === 'fait') return '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">Fait</span>';
+    if (s === 'urgent') return '<span style="background:#fecaca;color:#991b1b;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">Urgent</span>';
+    return '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">A prevoir</span>';
+  };
+  document.getElementById('vtab-entretien').innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+      <button class="btn btn-primary btn-sm" onclick="openAddEntretien()">+ Ajouter</button>
+    </div>
+    <table>
+      <thead><tr><th>Type</th><th>Statut</th><th>Date</th><th>Km</th><th>Prix</th><th>Notes</th><th></th></tr></thead>
+      <tbody>
+        ${(v.entretiens || []).map(e => `
+          <tr>
+            <td style="font-weight:500;">${e.type}</td>
+            <td>${statusBadge(e.statut)}</td>
+            <td>${e.date || '—'}</td>
+            <td>${e.km ? e.km.toLocaleString() : '—'}</td>
+            <td>${e.prix ? e.prix + ' EUR' : '—'}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">${e.notes || '—'}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="openEditEntretien('${e.id}')" style="margin-right:4px;">Modifier</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteEntretien('${e.id}')">X</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderVehicleFinancier(v) {
+  const months = (v.financier || []).sort((a, b) => (a.annee + a.mois) > (b.annee + b.mois) ? 1 : -1);
+
+  let tableRows = '';
+  months.forEach(f => {
+    const rev = parseFloat(f.revenus) || 0;
+    const commission = rev * 0.1;
+    const depEnt = parseFloat(f.depEntretien) || 0;
+    const depFixes = (parseFloat(f.assurance)||0) + (parseFloat(f.connect)||0) + (parseFloat(f.parking)||0) + (parseFloat(f.autres)||0);
+    const totalDep = commission + depEnt + depFixes;
+    const net = rev - totalDep;
+    const moisLabel = ['','Jan','Fev','Mar','Avr','Mai','Jun','Jul','Aou','Sep','Oct','Nov','Dec'][parseInt(f.mois)];
+    tableRows += `
+      <tr>
+        <td style="font-weight:500;">${moisLabel} ${f.annee}</td>
+        <td>${rev.toFixed(0)} EUR</td>
+        <td>${(f.jours||0)} j</td>
+        <td style="color:var(--danger);">-${commission.toFixed(0)} EUR</td>
+        <td>${depEnt.toFixed(0)} EUR</td>
+        <td>${depFixes.toFixed(0)} EUR</td>
+        <td style="font-weight:600;color:${net >= 0 ? 'var(--success)' : 'var(--danger)'};">${net >= 0 ? '+' : ''}${net.toFixed(0)} EUR</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="openEditFinancier('${f.id}')">Modifier</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteFinancier('${f.id}')">X</button>
+        </td>
+      </tr>`;
+  });
+
+  document.getElementById('vtab-financier').innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+      <button class="btn btn-primary btn-sm" onclick="openAddFinancier()">+ Ajouter un mois</button>
+    </div>
+    <table>
+      <thead><tr><th>Mois</th><th>Revenus bruts</th><th>Jours</th><th>Commission 10%</th><th>Entretien</th><th>Charges fixes</th><th>Net</th><th></th></tr></thead>
+      <tbody>${tableRows || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Aucune donnee</td></tr>'}</tbody>
+    </table>
+    <div class="chart-container" style="margin-top:20px;">
+      <canvas id="financier-chart" height="200"></canvas>
+    </div>
+  `;
+
+  // Chart
+  if (financierChart) financierChart.destroy();
+  if (months.length > 0) {
+    const labels = months.map(f => {
+      const m = ['','Jan','Fev','Mar','Avr','Mai','Jun','Jul','Aou','Sep','Oct','Nov','Dec'][parseInt(f.mois)];
+      return m + ' ' + f.annee;
+    });
+    const revenus = months.map(f => parseFloat(f.revenus) || 0);
+    const depenses = months.map(f => {
+      const rev = parseFloat(f.revenus) || 0;
+      return rev * 0.1 + (parseFloat(f.depEntretien)||0) + (parseFloat(f.assurance)||0) + (parseFloat(f.connect)||0) + (parseFloat(f.parking)||0) + (parseFloat(f.autres)||0);
+    });
+    const nets = revenus.map((r, i) => r - depenses[i]);
+
+    const ctx = document.getElementById('financier-chart').getContext('2d');
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    financierChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'CA Brut', data: revenus, backgroundColor: '#1D5C3B' },
+          { label: 'Depenses', data: depenses, backgroundColor: '#dc2626' },
+          { label: 'Net', data: nets, backgroundColor: '#3b82f6' }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: isDark ? '#ccc' : '#333' } } },
+        scales: {
+          x: { ticks: { color: isDark ? '#999' : '#666' }, grid: { color: isDark ? '#333' : '#eee' } },
+          y: { ticks: { color: isDark ? '#999' : '#666' }, grid: { color: isDark ? '#333' : '#eee' } }
+        }
+      }
+    });
+  }
+}
+
+// ====== VEHICLE CRUD ======
+let uploadedPhoto = '';
+
+function handlePhotoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    uploadedPhoto = ev.target.result;
+    document.getElementById('vf-photo-preview').innerHTML = `<img src="${uploadedPhoto}" style="max-height:80px;border-radius:6px;">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function openAddVehicle() {
+  document.getElementById('modal-vehicle-title').textContent = 'Ajouter un vehicule';
+  document.getElementById('vehicle-form').reset();
+  document.getElementById('vf-id').value = '';
+  uploadedPhoto = '';
+  document.getElementById('vf-photo-preview').innerHTML = '';
+  openModal('modal-vehicle');
+}
+
+function openEditVehicle() {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  if (!v) return;
+  document.getElementById('modal-vehicle-title').textContent = 'Modifier le vehicule';
+  document.getElementById('vf-id').value = v.id;
+  document.getElementById('vf-marque').value = v.marque;
+  document.getElementById('vf-modele').value = v.modele;
+  document.getElementById('vf-annee').value = v.annee || '';
+  document.getElementById('vf-moteur').value = v.moteur || '';
+  document.getElementById('vf-immat').value = v.immat;
+  document.getElementById('vf-statut').value = v.statut;
+  document.getElementById('vf-km-achat').value = v.kmAchat || '';
+  document.getElementById('vf-km-actuel').value = v.kmActuel || '';
+  document.getElementById('vf-date-achat').value = v.dateAchat || '';
+  document.getElementById('vf-prix-achat').value = v.prixAchat || '';
+  document.getElementById('vf-localisation').value = v.localisation || '';
+  document.getElementById('vf-lien-getaround').value = v.lienGetaround || '';
+  document.getElementById('vf-lien-histovec').value = v.lienHistovec || '';
+  document.getElementById('vf-lien-autoviza').value = v.lienAutoviza || '';
+  document.getElementById('vf-connect').value = v.connect || 'actif';
+  uploadedPhoto = v.photo || '';
+  document.getElementById('vf-photo-preview').innerHTML = v.photo ? `<img src="${v.photo}" style="max-height:80px;border-radius:6px;">` : '';
+  openModal('modal-vehicle');
+}
+
+function saveVehicle(e) {
+  e.preventDefault();
+  const id = document.getElementById('vf-id').value;
+  const obj = {
+    id: id || genId(),
+    marque: document.getElementById('vf-marque').value,
+    modele: document.getElementById('vf-modele').value,
+    annee: parseInt(document.getElementById('vf-annee').value) || null,
+    moteur: document.getElementById('vf-moteur').value,
+    immat: document.getElementById('vf-immat').value,
+    statut: document.getElementById('vf-statut').value,
+    kmAchat: parseInt(document.getElementById('vf-km-achat').value) || null,
+    kmActuel: parseInt(document.getElementById('vf-km-actuel').value) || null,
+    dateAchat: document.getElementById('vf-date-achat').value,
+    prixAchat: parseInt(document.getElementById('vf-prix-achat').value) || null,
+    localisation: document.getElementById('vf-localisation').value,
+    lienGetaround: document.getElementById('vf-lien-getaround').value,
+    lienHistovec: document.getElementById('vf-lien-histovec').value,
+    lienAutoviza: document.getElementById('vf-lien-autoviza').value,
+    connect: document.getElementById('vf-connect').value,
+    photo: uploadedPhoto
+  };
+
+  if (id) {
+    const idx = DATA.vehicles.findIndex(x => x.id === id);
+    if (idx >= 0) {
+      obj.entretiens = DATA.vehicles[idx].entretiens;
+      obj.financier = DATA.vehicles[idx].financier;
+      DATA.vehicles[idx] = obj;
+    }
+  } else {
+    obj.entretiens = defaultEntretiens();
+    obj.financier = [];
+    DATA.vehicles.push(obj);
+  }
+  saveData();
+  closeModal('modal-vehicle');
+  if (currentVehicleId === id) renderVehicleDetail();
+  else navigate('dashboard');
+}
+
+function deleteCurrentVehicle() {
+  if (!confirm('Supprimer ce vehicule ?')) return;
+  DATA.vehicles = DATA.vehicles.filter(x => x.id !== currentVehicleId);
+  saveData();
+  navigate('vehicles');
+}
+
+// ====== ENTRETIEN CRUD ======
+let uploadedDoc = '';
+
+function handleDocUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => { uploadedDoc = ev.target.result; };
+  reader.readAsDataURL(file);
+}
+
+function openAddEntretien() {
+  document.getElementById('modal-entretien-title').textContent = 'Ajouter un entretien';
+  document.getElementById('entretien-form').reset();
+  document.getElementById('ef-id').value = '';
+  uploadedDoc = '';
+  openModal('modal-entretien');
+}
+
+function openEditEntretien(eid) {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  const e = (v.entretiens || []).find(x => x.id === eid);
+  if (!e) return;
+  document.getElementById('modal-entretien-title').textContent = 'Modifier entretien';
+  document.getElementById('ef-id').value = e.id;
+  document.getElementById('ef-type').value = e.type;
+  document.getElementById('ef-statut').value = e.statut;
+  document.getElementById('ef-date').value = e.date || '';
+  document.getElementById('ef-km').value = e.km || '';
+  document.getElementById('ef-prix').value = e.prix || '';
+  document.getElementById('ef-notes').value = e.notes || '';
+  uploadedDoc = e.doc || '';
+  openModal('modal-entretien');
+}
+
+function saveEntretien(e) {
+  e.preventDefault();
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  if (!v) return;
+  if (!v.entretiens) v.entretiens = [];
+  const id = document.getElementById('ef-id').value;
+  const obj = {
+    id: id || genId(),
+    type: document.getElementById('ef-type').value,
+    statut: document.getElementById('ef-statut').value,
+    date: document.getElementById('ef-date').value,
+    km: parseInt(document.getElementById('ef-km').value) || null,
+    prix: parseFloat(document.getElementById('ef-prix').value) || null,
+    notes: document.getElementById('ef-notes').value,
+    doc: uploadedDoc
+  };
+  if (id) {
+    const idx = v.entretiens.findIndex(x => x.id === id);
+    if (idx >= 0) v.entretiens[idx] = obj;
+  } else {
+    v.entretiens.push(obj);
+  }
+  saveData();
+  closeModal('modal-entretien');
+  renderVehicleEntretien(v);
+}
+
+function deleteEntretien(eid) {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  if (!v) return;
+  v.entretiens = (v.entretiens || []).filter(x => x.id !== eid);
+  saveData();
+  renderVehicleEntretien(v);
+}
+
+// ====== FINANCIER CRUD ======
+function openAddFinancier() {
+  document.getElementById('financier-form').reset();
+  document.getElementById('ff-id').value = '';
+  document.getElementById('ff-annee').value = new Date().getFullYear();
+  openModal('modal-financier');
+}
+
+function openEditFinancier(fid) {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  const f = (v.financier || []).find(x => x.id === fid);
+  if (!f) return;
+  document.getElementById('ff-id').value = f.id;
+  document.getElementById('ff-mois').value = f.mois;
+  document.getElementById('ff-annee').value = f.annee;
+  document.getElementById('ff-revenus').value = f.revenus || 0;
+  document.getElementById('ff-jours').value = f.jours || 0;
+  document.getElementById('ff-dep-entretien').value = f.depEntretien || 0;
+  document.getElementById('ff-assurance').value = f.assurance || 0;
+  document.getElementById('ff-connect').value = f.connect || 0;
+  document.getElementById('ff-parking').value = f.parking || 0;
+  document.getElementById('ff-autres').value = f.autres || 0;
+  openModal('modal-financier');
+}
+
+function saveFinancier(e) {
+  e.preventDefault();
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  if (!v) return;
+  if (!v.financier) v.financier = [];
+  const id = document.getElementById('ff-id').value;
+  const obj = {
+    id: id || genId(),
+    mois: document.getElementById('ff-mois').value,
+    annee: document.getElementById('ff-annee').value,
+    revenus: document.getElementById('ff-revenus').value,
+    jours: document.getElementById('ff-jours').value,
+    depEntretien: document.getElementById('ff-dep-entretien').value,
+    assurance: document.getElementById('ff-assurance').value,
+    connect: document.getElementById('ff-connect').value,
+    parking: document.getElementById('ff-parking').value,
+    autres: document.getElementById('ff-autres').value
+  };
+  if (id) {
+    const idx = v.financier.findIndex(x => x.id === id);
+    if (idx >= 0) v.financier[idx] = obj;
+  } else {
+    v.financier.push(obj);
+  }
+  saveData();
+  closeModal('modal-financier');
+  renderVehicleFinancier(v);
+}
+
+function deleteFinancier(fid) {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
+  if (!v) return;
+  v.financier = (v.financier || []).filter(x => x.id !== fid);
+  saveData();
+  renderVehicleFinancier(v);
+}
+
+// ====== CHECKLIST ======
+const CHECKLIST_TEMPLATE = {
+  sections: [
+    {
+      title: 'Verification Exterieure',
+      items: ['Carrosserie (bosses, rayures, rouille)','Pneus (meme marque, dimension, usure)','Feux (avant, arriere, clignotants)','Vitres et retros (fissures, fonctionnement)']
+    },
+    {
+      title: 'Verification Interieure',
+      items: ['Sieges et tapis (usure, taches)','Tableau de bord (voyants, compteur)','Clim / chauffage','Odeurs suspectes','Commandes electriques (vitres, retros)']
+    },
+    {
+      title: 'Documents',
+      items: ['Carte grise conforme','CT de moins de 6 mois + anomalies','Certificat de non-gage','Carnet d\'entretien a jour','Factures entretien','Rapport Histovec','Certificat de cession pret']
+    },
+    {
+      title: 'Test de conduite',
+      items: ['Bruits moteur','Bruits suspension','Bruits freinage','Freins (efficacite, pedale)','Direction (jeu, vibrations)','Acceleration (reponse, fumee)','Embrayage (patinage, point)']
+    },
+    {
+      title: 'Autre',
+      items: ['Roue de secours + kit urgence','Double des cles']
+    },
+    {
+      title: 'Checklist vendeur',
+      items: ['Rapport Autoviza verifie','Rapport Histovec verifie','Photos propres de l\'annonce','Description coherente','CT precedent / PK vente / reparations','Autres annonces du vendeur verifiees','Tapis interieur (levier nego)']
+    }
+  ]
+};
+
+function renderChecklistPage() {
+  const saved = DATA.checklists || [];
+  document.getElementById('checklist-editor').style.display = 'none';
+
+  if (saved.length === 0) {
+    document.getElementById('checklist-saved-list').innerHTML = '<p style="color:var(--text-muted);font-size:14px;">Aucun dossier sauvegarde. Cliquez sur "Nouveau dossier" pour commencer.</p>';
+  } else {
+    document.getElementById('checklist-saved-list').innerHTML = saved.map(c => {
+      const total = c.checks ? Object.keys(c.checks).length : 0;
+      const checked = c.checks ? Object.values(c.checks).filter(Boolean).length : 0;
+      const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+      return `
+        <div class="saved-item" onclick="openSavedChecklist('${c.id}')">
+          <div>
+            <strong>${c.name || 'Sans nom'}</strong>
+            <div style="font-size:12px;color:var(--text-muted);">${c.date || ''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="score">${pct}%</span>
+            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteChecklist('${c.id}')">X</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+}
+
+function newChecklist() {
+  currentChecklistId = genId();
+  const cl = {
+    id: currentChecklistId,
+    name: '',
+    date: new Date().toISOString().split('T')[0],
+    checks: {},
+    notes: {}
+  };
+  // Initialize all checks
+  let idx = 0;
+  CHECKLIST_TEMPLATE.sections.forEach(s => {
+    s.items.forEach(() => {
+      cl.checks['item_' + idx] = false;
+      idx++;
+    });
+  });
+  DATA.checklists.push(cl);
+  saveData();
+  renderChecklistEditor();
+}
+
+function openSavedChecklist(id) {
+  currentChecklistId = id;
+  renderChecklistEditor();
+}
+
+function deleteChecklist(id) {
+  DATA.checklists = DATA.checklists.filter(x => x.id !== id);
+  saveData();
+  renderChecklistPage();
+}
+
+function renderChecklistEditor() {
+  const cl = DATA.checklists.find(x => x.id === currentChecklistId);
+  if (!cl) return;
+
+  document.getElementById('checklist-saved-list').innerHTML = '';
+  document.getElementById('checklist-editor').style.display = 'block';
+  document.getElementById('checklist-name').value = cl.name || '';
+
+  let idx = 0;
+  let html = '';
+  CHECKLIST_TEMPLATE.sections.forEach((section, si) => {
+    let sectionChecked = 0;
+    const sectionStart = idx;
+    const items = section.items.map((item, ii) => {
+      const key = 'item_' + idx;
+      const isChecked = cl.checks[key] || false;
+      if (isChecked) sectionChecked++;
+      const row = `
+        <div class="checklist-item ${isChecked ? 'checked' : ''}">
+          <input type="checkbox" id="ck_${key}" ${isChecked ? 'checked' : ''} onchange="toggleChecklistItem('${key}')">
+          <label for="ck_${key}">${item}</label>
+        </div>`;
+      idx++;
+      return row;
+    }).join('');
+    const sectionTotal = section.items.length;
+
+    html += `
+      <div class="checklist-section">
+        <h3>${section.title} <span style="font-size:13px;color:var(--text-muted);">${sectionChecked}/${sectionTotal}</span></h3>
+        ${items}
+        <div class="form-group" style="margin-top:8px;">
+          <textarea placeholder="Notes pour ${section.title}..." style="font-size:12px;min-height:40px;" onchange="saveChecklistNote('section_${si}', this.value)">${cl.notes['section_' + si] || ''}</textarea>
+        </div>
+      </div>`;
+  });
+  document.getElementById('checklist-sections').innerHTML = html;
+  updateChecklistScore();
+}
+
+function toggleChecklistItem(key) {
+  const cl = DATA.checklists.find(x => x.id === currentChecklistId);
+  if (!cl) return;
+  cl.checks[key] = !cl.checks[key];
+  saveData();
+  renderChecklistEditor();
+}
+
+function saveChecklistNote(key, val) {
+  const cl = DATA.checklists.find(x => x.id === currentChecklistId);
+  if (!cl) return;
+  cl.notes[key] = val;
+  saveData();
+}
+
+function updateChecklistScore() {
+  const cl = DATA.checklists.find(x => x.id === currentChecklistId);
+  if (!cl) return;
+  const total = Object.keys(cl.checks).length;
+  const checked = Object.values(cl.checks).filter(Boolean).length;
+  const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+  document.getElementById('checklist-score').textContent = pct + '%';
+  document.getElementById('checklist-score').style.color = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+  document.getElementById('checklist-score-bar').style.width = pct + '%';
+  document.getElementById('checklist-score-bar').style.background = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+}
+
+function saveChecklist() {
+  const cl = DATA.checklists.find(x => x.id === currentChecklistId);
+  if (!cl) return;
+  cl.name = document.getElementById('checklist-name').value || 'Sans nom';
+  saveData();
+  alert('Dossier sauvegarde !');
+}
+
+function closeChecklist() {
+  saveChecklist();
+  currentChecklistId = null;
+  renderChecklistPage();
+}
+
+function printChecklist() { window.print(); }
+
+// ====== PIPELINE KANBAN ======
+const PIPELINE_COLS = [
+  { id: 'repere', label: 'Repere' },
+  { id: 'm1_envoye', label: 'M1 envoye' },
+  { id: 'en_discussion', label: 'En discussion' },
+  { id: 'visite_planifiee', label: 'Visite planifiee' },
+  { id: 'achete', label: 'Achete' },
+  { id: 'abandonne', label: 'Abandonne' }
+];
+
+function renderPipeline() {
+  const board = document.getElementById('kanban-board');
+  board.innerHTML = PIPELINE_COLS.map(col => {
+    const cards = (DATA.pipeline || []).filter(c => c.etape === col.id);
+    return `
+      <div class="kanban-col" data-col="${col.id}"
+           ondragover="event.preventDefault();this.style.background='rgba(29,92,59,0.1)'"
+           ondragleave="this.style.background=''"
+           ondrop="dropCard(event,'${col.id}');this.style.background=''">
+        <div class="kanban-col-header">
+          ${col.label}
+          <span class="count">${cards.length}</span>
+        </div>
+        ${cards.map(c => pipelineCardHTML(c)).join('')}
+      </div>`;
+  }).join('');
+}
+
+function pipelineCardHTML(c) {
+  const avgScore = ((parseInt(c.scorePrix)||3) + (parseInt(c.scoreKm)||3) + (parseInt(c.scoreHisto)||3) + (parseInt(c.scoreMoteur)||3)) / 4;
+  const scoreColor = avgScore >= 4 ? '#dcfce7;color:#166534' : avgScore >= 2.5 ? '#fef3c7;color:#92400e' : '#fecaca;color:#991b1b';
+  return `
+    <div class="kanban-card" draggable="true" ondragstart="dragCard(event,'${c.id}')" onclick="openEditPipelineCard('${c.id}')">
+      <h4>${c.modele || 'Sans nom'}</h4>
+      <div class="meta">${c.km ? c.km.toLocaleString() + ' km' : ''}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+        <span class="price">${c.prix ? c.prix.toLocaleString() + ' EUR' : ''}</span>
+        ${c.prixCible ? '<span style="font-size:11px;color:var(--text-muted);">Cible: ' + c.prixCible.toLocaleString() + ' EUR</span>' : ''}
+      </div>
+      <span class="score-badge" style="background:${scoreColor}">${avgScore.toFixed(1)}/5</span>
+      ${c.notes ? '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + c.notes.substring(0, 60) + '</div>' : ''}
+    </div>`;
+}
+
+let draggedCardId = null;
+function dragCard(e, id) { draggedCardId = id; e.dataTransfer.effectAllowed = 'move'; }
+function dropCard(e, colId) {
+  e.preventDefault();
+  if (!draggedCardId) return;
+  const card = DATA.pipeline.find(c => c.id === draggedCardId);
+  if (card) {
+    card.etape = colId;
+    saveData();
+    renderPipeline();
+  }
+  draggedCardId = null;
+}
+
+function openAddPipelineCard() {
+  document.getElementById('modal-pipeline-title').textContent = 'Ajouter au pipeline';
+  document.getElementById('pipeline-form').reset();
+  document.getElementById('pf-id').value = '';
+  openModal('modal-pipeline');
+}
+
+function openEditPipelineCard(id) {
+  const c = DATA.pipeline.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('modal-pipeline-title').textContent = 'Modifier — ' + c.modele;
+  document.getElementById('pf-id').value = c.id;
+  document.getElementById('pf-modele').value = c.modele || '';
+  document.getElementById('pf-km').value = c.km || '';
+  document.getElementById('pf-prix').value = c.prix || '';
+  document.getElementById('pf-prix-cible').value = c.prixCible || '';
+  document.getElementById('pf-lien').value = c.lien || '';
+  document.getElementById('pf-etape').value = c.etape || 'repere';
+  document.getElementById('pf-score-prix').value = c.scorePrix || 3;
+  document.getElementById('pf-score-km').value = c.scoreKm || 3;
+  document.getElementById('pf-score-histo').value = c.scoreHisto || 3;
+  document.getElementById('pf-score-moteur').value = c.scoreMoteur || 3;
+  document.getElementById('pf-notes').value = c.notes || '';
+  openModal('modal-pipeline');
+}
+
+function savePipelineCard(e) {
+  e.preventDefault();
+  const id = document.getElementById('pf-id').value;
+  const obj = {
+    id: id || genId(),
+    modele: document.getElementById('pf-modele').value,
+    km: parseInt(document.getElementById('pf-km').value) || null,
+    prix: parseInt(document.getElementById('pf-prix').value) || null,
+    prixCible: parseInt(document.getElementById('pf-prix-cible').value) || null,
+    lien: document.getElementById('pf-lien').value,
+    etape: document.getElementById('pf-etape').value,
+    scorePrix: parseInt(document.getElementById('pf-score-prix').value) || 3,
+    scoreKm: parseInt(document.getElementById('pf-score-km').value) || 3,
+    scoreHisto: parseInt(document.getElementById('pf-score-histo').value) || 3,
+    scoreMoteur: parseInt(document.getElementById('pf-score-moteur').value) || 3,
+    notes: document.getElementById('pf-notes').value
+  };
+  if (id) {
+    const idx = DATA.pipeline.findIndex(x => x.id === id);
+    if (idx >= 0) DATA.pipeline[idx] = obj;
+  } else {
+    DATA.pipeline.push(obj);
+  }
+  saveData();
+  closeModal('modal-pipeline');
+  renderPipeline();
+}
+
+// ====== MODAL HELPERS ======
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('active'); });
+});
+
+// ====== THEME ======
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', current === 'dark' ? '' : 'dark');
+  localStorage.setItem('valgo_theme', current === 'dark' ? '' : 'dark');
+}
+(function() {
+  const saved = localStorage.getItem('valgo_theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+
+// ====== EXPORT / IMPORT ======
+function exportData() {
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'valgo_crm_backup_' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (imported.vehicles) {
+        DATA = imported;
+        saveData();
+        navigate('dashboard');
+        alert('Import reussi !');
+      } else {
+        alert('Fichier invalide');
+      }
+    } catch(err) {
+      alert('Erreur de parsing JSON');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ====== INIT ======
+renderDashboard();
+</script>
+</body>
+</html>
