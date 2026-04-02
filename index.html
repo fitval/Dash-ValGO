@@ -391,6 +391,64 @@ th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform
   padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px;
   font-size: 13px; font-family: inherit; background: var(--bg); color: var(--text);
 }
+/* Finance redesign */
+.fin-month-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--border);
+}
+.fin-month-header h2 { font-size: 22px; font-weight: 700; }
+.fin-month-header-actions { display: flex; gap: 8px; }
+.fin-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.fin-split-col { min-width: 0; }
+.fin-table-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.fin-table-card.expense { border-top: 3px solid var(--danger); }
+.fin-table-card.income { border-top: 3px solid var(--success); }
+.fin-table-card.recap { border-top: 3px solid var(--primary); }
+.fin-table-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.fin-table-header h3 { font-size: 14px; font-weight: 600; }
+.fin-table-total { font-size: 18px; font-weight: 700; }
+.fin-table-total.red { color: var(--danger); }
+.fin-table-total.green { color: var(--success); }
+.fin-table-scroll { overflow-x: auto; }
+.fin-table-card table { margin: 0; }
+.fin-table-card th { background: var(--bg); }
+.fin-table-card td { font-size: 13px; }
+.fin-table-card tfoot td { font-weight: 700; border-top: 2px solid var(--border); background: var(--bg); }
+.fin-table-card .row-actions { display: flex; gap: 4px; }
+.fin-table-card .doc-link { color: var(--info); cursor: pointer; text-decoration: none; }
+.fin-recap-row td { padding: 12px 16px; }
+.fin-recap-row.highlight td { font-size: 15px; font-weight: 700; }
+.fin-recap-row.highlight.green td { color: var(--success); background: rgba(22,163,74,0.05); }
+.fin-recap-row.highlight.red td { color: var(--danger); background: rgba(220,38,38,0.05); }
+.fin-recap-row.separator td { border-top: 2px solid var(--border); }
+.fin-recap-row .recap-label { color: var(--text-muted); font-size: 12px; }
+.fin-recap-row .recap-value { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fin-recap-row .recap-note { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+.platform-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+}
+.platform-badge.getaround { background: #dbeafe; color: #1d4ed8; }
+.platform-badge.turo { background: #f3e8ff; color: #7c3aed; }
+.platform-badge.autre { background: var(--border); color: var(--text-muted); }
+[data-theme="dark"] .platform-badge.getaround { background: #1e3a5f; color: #93c5fd; }
+[data-theme="dark"] .platform-badge.turo { background: #3b1f5e; color: #c4b5fd; }
+
 /* Responsive */
 .mobile-toggle {
   display: none; position: fixed; top: 12px; left: 12px; z-index: 150;
@@ -409,6 +467,8 @@ th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform
   .vehicle-grid { grid-template-columns: 1fr; }
   .month-grid { grid-template-columns: repeat(3, 1fr); }
   .finance-summary-row { grid-template-columns: 1fr 1fr; }
+  .fin-split { grid-template-columns: 1fr; }
+  .fin-month-header { flex-direction: column; gap: 10px; align-items: flex-start; }
 }
 @media print {
   .sidebar, .mobile-toggle, .btn, .sidebar-bottom, .tabs { display: none !important; }
@@ -523,30 +583,77 @@ th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform
       <select id="fin-year-filter" onchange="renderFinancier()"></select>
     </div>
   </div>
-  <!-- Vue annuelle: KPIs + graphique + grille mois -->
+
+  <!-- 1. Recap annuel -->
   <div class="kpi-row" id="fin-kpis"></div>
-  <div class="chart-container"><canvas id="fin-year-chart" height="220"></canvas></div>
+
+  <!-- 2. Selecteur de mois -->
   <h2 style="font-size:16px;font-weight:600;margin-bottom:12px;">Selectionner un mois</h2>
   <div class="month-grid" id="fin-month-grid"></div>
-  <!-- Vue mensuelle detail -->
+
+  <!-- 3. Detail mensuel -->
   <div id="fin-month-detail" style="display:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h2 id="fin-month-title" style="font-size:18px;font-weight:600;"></h2>
-      <button class="btn btn-ghost btn-sm" onclick="closeMonthDetail()">Fermer le detail</button>
+    <div class="fin-month-header">
+      <h2 id="fin-month-title"></h2>
+      <div class="fin-month-header-actions">
+        <button class="btn btn-primary btn-sm" onclick="openAddIncome()">+ Revenu</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddExpense()">+ Depense</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeMonthDetail()">Fermer</button>
+      </div>
     </div>
-    <div class="finance-summary-row" id="fin-month-summary"></div>
-    <!-- Revenus -->
-    <div class="section-header">
-      <h3 style="color:var(--success);">Revenus / Locations</h3>
-      <button class="btn btn-primary btn-sm" onclick="openAddIncome()">+ Ajouter un revenu</button>
+
+    <!-- 3a. Deux tableaux cote a cote -->
+    <div class="fin-split">
+      <div class="fin-split-col">
+        <div class="fin-table-card expense">
+          <div class="fin-table-header">
+            <h3>Sorties d'argent</h3>
+            <span class="fin-table-total" id="fin-total-out"></span>
+          </div>
+          <div class="fin-table-scroll">
+            <table id="fin-expense-table">
+              <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Vehicule</th><th>Montant</th><th></th></tr></thead>
+              <tbody id="fin-expense-tbody"></tbody>
+              <tfoot id="fin-expense-tfoot"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="fin-split-col">
+        <div class="fin-table-card income">
+          <div class="fin-table-header">
+            <h3>Rentrees d'argent</h3>
+            <span class="fin-table-total" id="fin-total-in"></span>
+          </div>
+          <div class="fin-table-scroll">
+            <table id="fin-income-table">
+              <thead><tr><th>Date</th><th>Description</th><th>Plateforme</th><th>Duree</th><th>Statut</th><th>Montant</th><th></th></tr></thead>
+              <tbody id="fin-income-tbody"></tbody>
+              <tfoot id="fin-income-tfoot"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
-    <div id="fin-income-list"></div>
-    <!-- Depenses -->
-    <div class="section-header">
-      <h3 style="color:var(--danger);">Depenses</h3>
-      <button class="btn btn-primary btn-sm" onclick="openAddExpense()">+ Ajouter une depense</button>
+
+    <!-- 3b. Tableau recapitulatif fiscal pleine largeur -->
+    <div class="fin-table-card recap">
+      <div class="fin-table-header"><h3>Recapitulatif &amp; Fiscalite</h3></div>
+      <table id="fin-recap-table">
+        <tbody id="fin-recap-tbody"></tbody>
+      </table>
     </div>
-    <div id="fin-expense-list"></div>
+
+    <!-- 3c. Graphique du mois -->
+    <div class="chart-container" style="margin-top:16px;">
+      <canvas id="fin-month-chart" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- 4. Graphique annuel (en bas) -->
+  <div class="chart-container" style="margin-top:24px;">
+    <h3 style="font-size:15px;font-weight:600;margin-bottom:12px;">Vue annuelle</h3>
+    <canvas id="fin-year-chart" height="220"></canvas>
   </div>
 </div>
 
@@ -1149,6 +1256,8 @@ function getFilteredData() {
   return { incomes, expenses, year };
 }
 
+let finMonthChart = null;
+
 function renderFinancier() {
   const { incomes, expenses, year } = getFilteredData();
 
@@ -1159,11 +1268,18 @@ function renderFinancier() {
   const pending = incomes.filter(i => i.status === 'attente').reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
   const joursTotal = incomes.reduce((s, i) => s + (parseInt(i.duration) || 0), 0);
 
+  // Fiscal estimates for the year
+  const cotisationsSociales = totalIn * 0.222; // Micro-BIC 22.2%
+  const abattementForfaitaire = totalIn * 0.5;  // 50% abattement micro-BIC
+  const baseImposable = totalIn - abattementForfaitaire;
+  const netApresCharges = net - cotisationsSociales;
+
   document.getElementById('fin-kpis').innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">Revenus ${year}</div><div class="kpi-value green">${totalIn.toFixed(0)} EUR</div></div>
+    <div class="kpi-card"><div class="kpi-label">Revenus bruts ${year}</div><div class="kpi-value green">${totalIn.toFixed(0)} EUR</div></div>
     <div class="kpi-card"><div class="kpi-label">Depenses ${year}</div><div class="kpi-value red">${totalOut.toFixed(0)} EUR</div></div>
-    <div class="kpi-card"><div class="kpi-label">Benefice net</div><div class="kpi-value ${net >= 0 ? 'green' : 'red'}">${net >= 0 ? '+' : ''}${net.toFixed(0)} EUR</div></div>
-    <div class="kpi-card"><div class="kpi-label">En attente</div><div class="kpi-value" style="color:var(--warning)">${pending.toFixed(0)} EUR</div></div>
+    <div class="kpi-card"><div class="kpi-label">Resultat brut</div><div class="kpi-value ${net >= 0 ? 'green' : 'red'}">${net >= 0 ? '+' : ''}${net.toFixed(0)} EUR</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cotisations sociales</div><div class="kpi-value red">-${cotisationsSociales.toFixed(0)} EUR</div></div>
+    <div class="kpi-card"><div class="kpi-label">Resultat net</div><div class="kpi-value ${netApresCharges >= 0 ? 'green' : 'red'}">${netApresCharges >= 0 ? '+' : ''}${netApresCharges.toFixed(0)} EUR</div></div>
     <div class="kpi-card"><div class="kpi-label">Jours loues</div><div class="kpi-value">${joursTotal} j</div></div>
   `;
 
@@ -1185,7 +1301,7 @@ function renderFinancier() {
       <div class="month-tile ${isActive ? 'active' : ''}" onclick="openMonthDetail('${d.mm}')" style="${!hasData ? 'opacity:0.5;' : ''}">
         <div class="month-name">${d.label}</div>
         <div class="month-net" style="color:${d.net >= 0 ? 'var(--success)' : 'var(--danger)'}">${d.net >= 0 ? '+' : ''}${d.net.toFixed(0)} EUR</div>
-        <div class="month-detail">${d.income.toFixed(0)} EUR in / ${d.expense.toFixed(0)} EUR out</div>
+        <div class="month-detail">${d.income.toFixed(0)} in / ${d.expense.toFixed(0)} out</div>
       </div>`;
   }).join('');
 
@@ -1213,14 +1329,12 @@ function renderFinancier() {
     }
   });
 
-  // If month detail is open, refresh it
   if (selectedMonth) renderMonthDetail();
 }
 
 function openMonthDetail(mm) {
   selectedMonth = mm;
   document.getElementById('fin-month-detail').style.display = 'block';
-  // Update active tile
   document.querySelectorAll('.month-tile').forEach(t => t.classList.remove('active'));
   event.currentTarget.classList.add('active');
   renderMonthDetail();
@@ -1236,59 +1350,159 @@ function closeMonthDetail() {
 function renderMonthDetail() {
   const { incomes, expenses, year } = getFilteredData();
   const prefix = year + '-' + selectedMonth;
-  const mIncomes = incomes.filter(i => i.dateStart.startsWith(prefix));
-  const mExpenses = expenses.filter(e => e.date.startsWith(prefix));
+  const mIncomes = incomes.filter(i => i.dateStart.startsWith(prefix)).sort((a, b) => a.dateStart.localeCompare(b.dateStart));
+  const mExpenses = expenses.filter(e => e.date.startsWith(prefix)).sort((a, b) => a.date.localeCompare(b.date));
 
   const totalIn = mIncomes.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
   const totalOut = mExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   const net = totalIn - totalOut;
   const pending = mIncomes.filter(i => i.status === 'attente').reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
   const jours = mIncomes.reduce((s, i) => s + (parseInt(i.duration) || 0), 0);
+  const daysInMonth = new Date(parseInt(year), parseInt(selectedMonth), 0).getDate();
+  const nbVehicles = document.getElementById('fin-vehicle-filter').value === 'all' ? DATA.vehicles.length : 1;
+  const tauxOccupation = nbVehicles > 0 ? Math.round((jours / (daysInMonth * nbVehicles)) * 100) : 0;
+
+  // Fiscal calculations (micro-BIC)
+  const commissionPlateforme = totalIn * 0.10; // ~10% Getaround/Turo commission estimee
+  const revenusNetsCommission = totalIn - commissionPlateforme;
+  const cotisationsSociales = totalIn * 0.222; // URSSAF micro-BIC
+  const abattement50 = totalIn * 0.5;
+  const baseImposable = totalIn - abattement50;
+  const beneficeBrut = totalIn - totalOut;
+  const beneficeNet = beneficeBrut - cotisationsSociales;
+
+  const getVehicleName = (vid) => { const v = DATA.vehicles.find(x => x.id === vid); return v ? v.immat : '?'; };
+  const fmtDate = (d) => { if (!d) return '—'; const parts = d.split('-'); return parts[2] + '/' + parts[1]; };
 
   document.getElementById('fin-month-title').textContent = MONTH_NAMES[parseInt(selectedMonth) - 1] + ' ' + year;
 
-  document.getElementById('fin-month-summary').innerHTML = `
-    <div class="finance-summary-card"><div class="label">Revenus</div><div class="value" style="color:var(--success)">${totalIn.toFixed(2)} EUR</div></div>
-    <div class="finance-summary-card"><div class="label">Depenses</div><div class="value" style="color:var(--danger)">${totalOut.toFixed(2)} EUR</div></div>
-    <div class="finance-summary-card"><div class="label">Net</div><div class="value" style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">${net >= 0 ? '+' : ''}${net.toFixed(2)} EUR</div></div>
-    <div class="finance-summary-card"><div class="label">En attente</div><div class="value" style="color:var(--warning)">${pending.toFixed(2)} EUR</div></div>
-    <div class="finance-summary-card"><div class="label">Jours loues</div><div class="value">${jours}</div></div>
+  // ---- EXPENSE TABLE (left) ----
+  document.getElementById('fin-total-out').innerHTML = `<span class="red">-${totalOut.toFixed(2)} EUR</span>`;
+
+  const expensesByType = {};
+  mExpenses.forEach(e => {
+    const t = e.type || 'autre';
+    if (!expensesByType[t]) expensesByType[t] = 0;
+    expensesByType[t] += parseFloat(e.amount) || 0;
+  });
+
+  document.getElementById('fin-expense-tbody').innerHTML = mExpenses.length === 0
+    ? '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">Aucune depense</td></tr>'
+    : mExpenses.map(e => `
+      <tr>
+        <td style="white-space:nowrap;">${fmtDate(e.date)}</td>
+        <td>
+          ${e.name}
+          ${e.doc ? ' <span class="doc-link" onclick="openDocPreview(\'' + e.id + '\',\'expense\')" title="Voir document">&#128206;</span>' : ''}
+        </td>
+        <td><span class="entry-type">${EXPENSE_TYPE_LABELS[e.type] || e.type}</span></td>
+        <td style="font-size:11px;">${getVehicleName(e.vehicleId)}</td>
+        <td style="color:var(--danger);font-weight:600;white-space:nowrap;">-${parseFloat(e.amount).toFixed(2)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn btn-secondary btn-sm" onclick="openEditExpense('${e.id}')">&#9998;</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}')">&#10005;</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+  document.getElementById('fin-expense-tfoot').innerHTML = `
+    <tr><td colspan="4" style="text-align:right;font-weight:600;">Total sorties</td><td style="color:var(--danger);font-weight:700;">-${totalOut.toFixed(2)}</td><td></td></tr>`;
+
+  // ---- INCOME TABLE (right) ----
+  document.getElementById('fin-total-in').innerHTML = `<span class="green">+${totalIn.toFixed(2)} EUR</span>`;
+
+  document.getElementById('fin-income-tbody').innerHTML = mIncomes.length === 0
+    ? '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">Aucun revenu</td></tr>'
+    : mIncomes.map(i => `
+      <tr>
+        <td style="white-space:nowrap;">${fmtDate(i.dateStart)}</td>
+        <td>
+          ${i.name}
+          ${i.doc ? ' <span class="doc-link" onclick="openDocPreview(\'' + i.id + '\',\'income\')" title="Voir document">&#128206;</span>' : ''}
+        </td>
+        <td><span class="platform-badge ${i.platform || 'getaround'}">${(i.platform || 'getaround').toUpperCase()}</span></td>
+        <td>${i.duration || '—'}j</td>
+        <td><span class="entry-status ${i.status}">${i.status === 'recu' ? 'Recu' : 'Attente'}</span></td>
+        <td style="color:var(--success);font-weight:600;white-space:nowrap;">+${parseFloat(i.amount).toFixed(2)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn btn-secondary btn-sm" onclick="openEditIncome('${i.id}')">&#9998;</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteIncome('${i.id}')">&#10005;</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+  document.getElementById('fin-income-tfoot').innerHTML = `
+    <tr><td colspan="5" style="text-align:right;font-weight:600;">Total rentrees</td><td style="color:var(--success);font-weight:700;">+${totalIn.toFixed(2)}</td><td></td></tr>
+    ${pending > 0 ? '<tr><td colspan="5" style="text-align:right;font-size:12px;color:var(--warning);">dont en attente</td><td style="color:var(--warning);font-size:12px;">'+pending.toFixed(2)+'</td><td></td></tr>' : ''}`;
+
+  // ---- RECAP FISCAL TABLE ----
+  document.getElementById('fin-recap-tbody').innerHTML = `
+    <tr class="fin-recap-row"><td class="recap-label" style="width:60%;">Revenus bruts (locations)</td><td class="recap-value" style="color:var(--success);">+${totalIn.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row"><td class="recap-label">Commission plateforme estimee (~10%)</td><td class="recap-value" style="color:var(--danger);">-${commissionPlateforme.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row"><td class="recap-label">Revenus nets apres commission</td><td class="recap-value">${revenusNetsCommission.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row separator"><td class="recap-label">Total depenses (entretien, charges, etc.)</td><td class="recap-value" style="color:var(--danger);">-${totalOut.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row highlight ${beneficeBrut >= 0 ? 'green' : 'red'}"><td>Benefice brut (avant charges sociales)</td><td class="recap-value">${beneficeBrut >= 0 ? '+' : ''}${beneficeBrut.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row separator"><td class="recap-label">Cotisations sociales URSSAF (22.2% du CA) <span class="recap-note">Micro-BIC</span></td><td class="recap-value" style="color:var(--danger);">-${cotisationsSociales.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row highlight ${beneficeNet >= 0 ? 'green' : 'red'}"><td>Benefice net (apres charges sociales)</td><td class="recap-value">${beneficeNet >= 0 ? '+' : ''}${beneficeNet.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row separator"><td class="recap-label">Abattement forfaitaire 50% (micro-BIC)</td><td class="recap-value">${abattement50.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row"><td class="recap-label">Base imposable (IR) <span class="recap-note">Apres abattement 50%</span></td><td class="recap-value">${baseImposable.toFixed(2)} EUR</td></tr>
+    <tr class="fin-recap-row separator"><td class="recap-label">Taux d'occupation</td><td class="recap-value">${tauxOccupation}% <span class="recap-note">(${jours}j / ${daysInMonth * nbVehicles}j)</span></td></tr>
+    <tr class="fin-recap-row"><td class="recap-label">Paiements en attente</td><td class="recap-value" style="color:var(--warning);">${pending.toFixed(2)} EUR</td></tr>
   `;
 
-  // Income list
-  const getVehicleName = (vid) => { const v = DATA.vehicles.find(x => x.id === vid); return v ? v.marque + ' ' + v.modele : '?'; };
+  // ---- MONTH CHART ----
+  if (finMonthChart) finMonthChart.destroy();
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-  document.getElementById('fin-income-list').innerHTML = mIncomes.length === 0
-    ? '<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">Aucun revenu ce mois</p>'
-    : mIncomes.map(i => `
-      <div class="entry-row">
-        <div class="entry-name">${i.name}${i.duration ? ' <span style="color:var(--text-muted);font-size:11px;">(' + i.duration + 'j)</span>' : ''}</div>
-        <span class="entry-vehicle">${getVehicleName(i.vehicleId)}</span>
-        <span class="entry-type">${i.platform || 'getaround'}</span>
-        <span class="entry-status ${i.status}">${i.status === 'recu' ? 'Recu' : 'Attente'}</span>
-        <span class="entry-amount income">+${parseFloat(i.amount).toFixed(2)} EUR</span>
-        ${i.doc ? '<span class="entry-doc-icon" onclick="openDocPreview(\'' + i.id + '\',\'income\')" title="Voir document">&#128206;</span>' : ''}
-        <div class="entry-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openEditIncome('${i.id}')">Modifier</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteIncome('${i.id}')">X</button>
-        </div>
-      </div>`).join('');
+  // Build daily data
+  const dailyIn = {};
+  const dailyOut = {};
+  mIncomes.forEach(i => {
+    const day = parseInt(i.dateStart.split('-')[2]) || 1;
+    dailyIn[day] = (dailyIn[day] || 0) + (parseFloat(i.amount) || 0);
+  });
+  mExpenses.forEach(e => {
+    const day = parseInt(e.date.split('-')[2]) || 1;
+    dailyOut[day] = (dailyOut[day] || 0) + (parseFloat(e.amount) || 0);
+  });
 
-  // Expense list
-  document.getElementById('fin-expense-list').innerHTML = mExpenses.length === 0
-    ? '<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">Aucune depense ce mois</p>'
-    : mExpenses.map(e => `
-      <div class="entry-row">
-        <div class="entry-name">${e.name}</div>
-        <span class="entry-vehicle">${getVehicleName(e.vehicleId)}</span>
-        <span class="entry-type">${EXPENSE_TYPE_LABELS[e.type] || e.type}</span>
-        <span class="entry-amount expense">-${parseFloat(e.amount).toFixed(2)} EUR</span>
-        ${e.doc ? '<span class="entry-doc-icon" onclick="openDocPreview(\'' + e.id + '\',\'expense\')" title="Voir document">&#128206;</span>' : ''}
-        <div class="entry-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openEditExpense('${e.id}')">Modifier</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}')">X</button>
-        </div>
-      </div>`).join('');
+  const chartLabels = [];
+  const chartIn = [];
+  const chartOut = [];
+  const chartCumul = [];
+  let cumul = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    chartLabels.push(d);
+    const dayIn = dailyIn[d] || 0;
+    const dayOut = dailyOut[d] || 0;
+    chartIn.push(dayIn);
+    chartOut.push(-dayOut);
+    cumul += dayIn - dayOut;
+    chartCumul.push(cumul);
+  }
+
+  const ctxMonth = document.getElementById('fin-month-chart').getContext('2d');
+  finMonthChart = new Chart(ctxMonth, {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [
+        { label: 'Revenus', data: chartIn, backgroundColor: '#1D5C3B', order: 2 },
+        { label: 'Depenses', data: chartOut, backgroundColor: '#dc2626', order: 2 },
+        { label: 'Cumul net', data: chartCumul, type: 'line', borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3, pointRadius: 2, order: 1 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: isDark ? '#ccc' : '#333' } } },
+      scales: {
+        x: { title: { display: true, text: 'Jour du mois', color: isDark ? '#999' : '#666' }, ticks: { color: isDark ? '#999' : '#666' }, grid: { color: isDark ? '#333' : '#eee' } },
+        y: { ticks: { color: isDark ? '#999' : '#666' }, grid: { color: isDark ? '#333' : '#eee' } }
+      }
+    }
+  });
 }
 
 function openDocPreview(id, type) {
