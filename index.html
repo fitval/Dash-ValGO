@@ -881,9 +881,12 @@ th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform
 </div>
 
 <script>
-// ====== DATA LAYER ======
-const STORAGE_KEY = 'valgo_crm';
-let DATA = loadData();
+// ====== DATA LAYER (IndexedDB) ======
+const DB_NAME = 'valgo_crm_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'data';
+let DATA = defaultData();
+let db = null;
 
 function defaultData() {
   return {
@@ -907,14 +910,60 @@ function defaultEntretiens() {
   return types.map((t, i) => ({ id: 'e' + i, type: t, statut: 'a_prevoir', date: '', km: null, prix: null, notes: '', doc: '' }));
 }
 
+function genId() { return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+
+// Open IndexedDB
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+    req.onerror = (e) => { console.error('IndexedDB error:', e); reject(e); };
+  });
+}
+
+// Load data from IndexedDB, fallback to localStorage migration
 function loadData() {
+  return new Promise(async (resolve) => {
+    try {
+      await openDB();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get('main');
+      req.onsuccess = () => {
+        if (req.result) {
+          const d = req.result;
+          if (!d.incomes) d.incomes = [];
+          if (!d.expenses) d.expenses = [];
+          DATA = d;
+          resolve(DATA);
+        } else {
+          // Try migrate from localStorage
+          migrateFromLocalStorage();
+          resolve(DATA);
+        }
+      };
+      req.onerror = () => { migrateFromLocalStorage(); resolve(DATA); };
+    } catch(e) {
+      console.error('DB load failed:', e);
+      migrateFromLocalStorage();
+      resolve(DATA);
+    }
+  });
+}
+
+function migrateFromLocalStorage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem('valgo_crm');
     if (raw) {
       const d = JSON.parse(raw);
       if (!d.incomes) d.incomes = [];
       if (!d.expenses) d.expenses = [];
-      // Migrate old financier data if present
       d.vehicles.forEach(v => {
         if (v.financier && v.financier.length > 0) {
           v.financier.forEach(f => {
@@ -940,14 +989,50 @@ function loadData() {
           delete v.financier;
         }
       });
-      return d;
+      DATA = d;
+      saveData(); // Save to IndexedDB
+      localStorage.removeItem('valgo_crm'); // Clean up old storage
+      console.log('Migrated from localStorage to IndexedDB');
     }
-  } catch(e) {}
-  return defaultData();
+  } catch(e) { console.error('localStorage migration failed:', e); }
 }
 
-function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
-function genId() { return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+// Save data to IndexedDB
+function saveData() {
+  if (!db) { console.error('DB not ready'); return; }
+  try {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(DATA, 'main');
+    tx.onerror = (e) => {
+      console.error('Save failed:', e);
+      alert('Erreur de sauvegarde ! Verifiez l\'espace disque disponible.');
+    };
+  } catch(e) {
+    console.error('Save error:', e);
+    alert('Erreur de sauvegarde : ' + e.message);
+  }
+}
+
+// Compress image to max ~300KB
+function compressImage(dataUrl, maxWidth, quality) {
+  maxWidth = maxWidth || 800;
+  quality = quality || 0.7;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = h * (maxWidth / w); w = maxWidth; }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
 
 // ====== NAVIGATION ======
 let currentVehicleId = null;
@@ -1116,7 +1201,10 @@ let uploadedPhoto = '';
 function handlePhotoUpload(e) {
   const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = (ev) => { uploadedPhoto = ev.target.result; document.getElementById('vf-photo-preview').innerHTML = `<img src="${uploadedPhoto}" style="max-height:80px;border-radius:6px;">`; };
+  reader.onload = async (ev) => {
+    uploadedPhoto = await compressImage(ev.target.result, 800, 0.7);
+    document.getElementById('vf-photo-preview').innerHTML = `<img src="${uploadedPhoto}" style="max-height:80px;border-radius:6px;">`;
+  };
   reader.readAsDataURL(file);
 }
 function openAddVehicle() {
@@ -1831,7 +1919,11 @@ function importData(e) {
 }
 
 // ====== INIT ======
-renderDashboard();
+(async function init() {
+  await loadData();
+  renderDashboard();
+  console.log('ValGo CRM loaded — IndexedDB storage active');
+})();
 </script>
 </body>
 </html>
