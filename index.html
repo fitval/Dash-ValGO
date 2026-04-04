@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root {
   --primary: #1D5C3B;
@@ -881,29 +882,12 @@ th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform
 </div>
 
 <script>
-// ====== DATA LAYER (IndexedDB) ======
-const DB_NAME = 'valgo_crm_db';
-const DB_VERSION = 1;
-const STORE_NAME = 'data';
-let DATA = defaultData();
-let db = null;
+// ====== DATA LAYER (Supabase) ======
+const SUPABASE_URL = 'https://wojjjjotdrzhuwoyjbuv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indvampqam90ZHJ6aHV3b3lqYnV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMDQzNzcsImV4cCI6MjA5MDg4MDM3N30.-kbUQ4dinIEeUWjWR5IhPEFwZLN1sGCzPf8vLavO1cY';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-function defaultData() {
-  return {
-    vehicles: [{
-      id: 'v1', marque: 'Fiat', modele: '500 Lounge', annee: 2015,
-      moteur: '1.2 Fire 69ch', immat: 'DN499LM', statut: 'actif',
-      kmAchat: null, kmActuel: null, dateAchat: null, prixAchat: null,
-      localisation: 'Gardanne', lienGetaround: '', lienHistovec: '', lienAutoviza: '',
-      connect: 'actif', photo: '',
-      entretiens: defaultEntretiens()
-    }],
-    checklists: [],
-    pipeline: [],
-    incomes: [],
-    expenses: []
-  };
-}
+let DATA = { vehicles: [], checklists: [], pipeline: [], incomes: [], expenses: [] };
 
 function defaultEntretiens() {
   const types = ['Pneus','Essuie-glaces','Courroie de distribution','Vidange','Freins','Filtres','CT','Embrayage','Courroie accessoires'];
@@ -912,106 +896,103 @@ function defaultEntretiens() {
 
 function genId() { return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
 
-// Open IndexedDB
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const database = e.target.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME);
-      }
-    };
-    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
-    req.onerror = (e) => { console.error('IndexedDB error:', e); reject(e); };
-  });
+// ---- Supabase CRUD helpers ----
+async function dbLoad(table) {
+  const { data, error } = await supabase.from(table).select('*');
+  if (error) { console.error(`Load ${table}:`, error); return []; }
+  return data || [];
 }
 
-// Load data from IndexedDB, fallback to localStorage migration
-function loadData() {
-  return new Promise(async (resolve) => {
-    try {
-      await openDB();
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get('main');
-      req.onsuccess = () => {
-        if (req.result) {
-          const d = req.result;
-          if (!d.incomes) d.incomes = [];
-          if (!d.expenses) d.expenses = [];
-          DATA = d;
-          resolve(DATA);
-        } else {
-          // Try migrate from localStorage
-          migrateFromLocalStorage();
-          resolve(DATA);
-        }
+async function dbUpsert(table, id, data, extra) {
+  const row = { id, data, updated_at: new Date().toISOString(), ...extra };
+  const { error } = await supabase.from(table).upsert(row);
+  if (error) { console.error(`Upsert ${table}:`, error); alert('Erreur de sauvegarde: ' + error.message); }
+}
+
+async function dbDelete(table, id) {
+  const { error } = await supabase.from(table).delete().eq('id', id);
+  if (error) { console.error(`Delete ${table}:`, error); }
+}
+
+// ---- Load all data from Supabase ----
+async function loadData() {
+  try {
+    const [vehicles, entretiens, incomes, expenses, checklists, pipeline] = await Promise.all([
+      dbLoad('vehicles'), dbLoad('entretiens'), dbLoad('incomes'),
+      dbLoad('expenses'), dbLoad('checklists'), dbLoad('pipeline')
+    ]);
+
+    // Rebuild vehicles with their entretiens
+    DATA.vehicles = vehicles.map(v => {
+      const d = v.data;
+      d.id = v.id;
+      d.entretiens = entretiens.filter(e => e.vehicle_id === v.id).map(e => ({ ...e.data, id: e.id }));
+      if (d.entretiens.length === 0) d.entretiens = defaultEntretiens();
+      return d;
+    });
+
+    DATA.incomes = incomes.map(i => ({ ...i.data, id: i.id }));
+    DATA.expenses = expenses.map(e => ({ ...e.data, id: e.id }));
+    DATA.checklists = checklists.map(c => ({ ...c.data, id: c.id }));
+    DATA.pipeline = pipeline.map(p => ({ ...p.data, id: p.id }));
+
+    // If DB is empty, seed with default Fiat 500
+    if (DATA.vehicles.length === 0) {
+      const defaultV = {
+        id: 'v1', marque: 'Fiat', modele: '500 Lounge', annee: 2015,
+        moteur: '1.2 Fire 69ch', immat: 'DN499LM', statut: 'actif',
+        kmAchat: null, kmActuel: null, dateAchat: null, prixAchat: null,
+        localisation: 'Gardanne', lienGetaround: '', lienHistovec: '', lienAutoviza: '',
+        connect: 'actif', photo: '', entretiens: defaultEntretiens()
       };
-      req.onerror = () => { migrateFromLocalStorage(); resolve(DATA); };
-    } catch(e) {
-      console.error('DB load failed:', e);
-      migrateFromLocalStorage();
-      resolve(DATA);
+      DATA.vehicles.push(defaultV);
+      await saveVehicleToDB(defaultV);
     }
-  });
-}
 
-function migrateFromLocalStorage() {
-  try {
-    const raw = localStorage.getItem('valgo_crm');
-    if (raw) {
-      const d = JSON.parse(raw);
-      if (!d.incomes) d.incomes = [];
-      if (!d.expenses) d.expenses = [];
-      d.vehicles.forEach(v => {
-        if (v.financier && v.financier.length > 0) {
-          v.financier.forEach(f => {
-            const rev = parseFloat(f.revenus) || 0;
-            if (rev > 0) {
-              d.incomes.push({
-                id: genId(), vehicleId: v.id, name: 'Revenus ' + f.mois + '/' + f.annee,
-                dateStart: f.annee + '-' + f.mois + '-01', dateEnd: '', duration: parseInt(f.jours) || 0,
-                amount: rev, platform: 'getaround', status: 'recu', notes: 'Migre depuis ancien format', doc: ''
-              });
-            }
-            const types = {depEntretien:'entretien',assurance:'assurance',connect:'abonnement_connect',parking:'stationnement',autres:'autre'};
-            Object.entries(types).forEach(([key, type]) => {
-              const val = parseFloat(f[key]) || 0;
-              if (val > 0) {
-                d.expenses.push({
-                  id: genId(), vehicleId: v.id, name: type.charAt(0).toUpperCase() + type.slice(1),
-                  type, date: f.annee + '-' + f.mois + '-01', amount: val, notes: 'Migre depuis ancien format', doc: ''
-                });
-              }
-            });
-          });
-          delete v.financier;
-        }
-      });
-      DATA = d;
-      saveData(); // Save to IndexedDB
-      localStorage.removeItem('valgo_crm'); // Clean up old storage
-      console.log('Migrated from localStorage to IndexedDB');
-    }
-  } catch(e) { console.error('localStorage migration failed:', e); }
-}
-
-// Save data to IndexedDB
-function saveData() {
-  if (!db) { console.error('DB not ready'); return; }
-  try {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    store.put(DATA, 'main');
-    tx.onerror = (e) => {
-      console.error('Save failed:', e);
-      alert('Erreur de sauvegarde ! Verifiez l\'espace disque disponible.');
-    };
+    console.log('Supabase: loaded', DATA.vehicles.length, 'vehicles,', DATA.incomes.length, 'incomes,', DATA.expenses.length, 'expenses');
   } catch(e) {
-    console.error('Save error:', e);
-    alert('Erreur de sauvegarde : ' + e.message);
+    console.error('loadData failed:', e);
+    alert('Erreur de chargement Supabase. Verifiez votre connexion.');
   }
+}
+
+// ---- Save helpers per entity ----
+async function saveVehicleToDB(v) {
+  const { entretiens, ...vData } = v;
+  await dbUpsert('vehicles', v.id, vData);
+  // Save entretiens
+  if (entretiens) {
+    for (const e of entretiens) {
+      await dbUpsert('entretiens', e.id, e, { vehicle_id: v.id });
+    }
+  }
+}
+
+async function saveIncomeToDB(i) {
+  await dbUpsert('incomes', i.id, i, { vehicle_id: i.vehicleId || null });
+}
+
+async function saveExpenseToDB(e) {
+  await dbUpsert('expenses', e.id, e, { vehicle_id: e.vehicleId || null });
+}
+
+async function saveChecklistToDB(c) {
+  await dbUpsert('checklists', c.id, c);
+}
+
+async function savePipelineToDB(p) {
+  await dbUpsert('pipeline', p.id, p);
+}
+
+// Legacy saveData — now syncs full state (used by export/import)
+async function saveData() {
+  try {
+    for (const v of DATA.vehicles) await saveVehicleToDB(v);
+    for (const i of DATA.incomes) await saveIncomeToDB(i);
+    for (const e of DATA.expenses) await saveExpenseToDB(e);
+    for (const c of DATA.checklists) await saveChecklistToDB(c);
+    for (const p of DATA.pipeline) await savePipelineToDB(p);
+  } catch(e) { console.error('saveData full sync failed:', e); }
 }
 
 // Compress image to max ~300KB
@@ -1236,7 +1217,7 @@ function openEditVehicle() {
   document.getElementById('vf-photo-preview').innerHTML = v.photo ? `<img src="${v.photo}" style="max-height:80px;border-radius:6px;">` : '';
   openModal('modal-vehicle');
 }
-function saveVehicle(e) {
+async function saveVehicle(e) {
   e.preventDefault();
   const id = document.getElementById('vf-id').value;
   const obj = {
@@ -1255,13 +1236,15 @@ function saveVehicle(e) {
     const idx = DATA.vehicles.findIndex(x => x.id === id);
     if (idx >= 0) { obj.entretiens = DATA.vehicles[idx].entretiens; DATA.vehicles[idx] = obj; }
   } else { obj.entretiens = defaultEntretiens(); DATA.vehicles.push(obj); }
-  saveData(); closeModal('modal-vehicle');
+  await saveVehicleToDB(obj);
+  closeModal('modal-vehicle');
   if (currentVehicleId === id) renderVehicleDetail(); else navigate('dashboard');
 }
-function deleteCurrentVehicle() {
+async function deleteCurrentVehicle() {
   if (!confirm('Supprimer ce vehicule ?')) return;
   DATA.vehicles = DATA.vehicles.filter(x => x.id !== currentVehicleId);
-  saveData(); navigate('vehicles');
+  await dbDelete('vehicles', currentVehicleId);
+  navigate('vehicles');
 }
 
 // ====== ENTRETIEN CRUD ======
@@ -1285,7 +1268,7 @@ function openEditEntretien(eid) {
   document.getElementById('ef-prix').value = e.prix || ''; document.getElementById('ef-notes').value = e.notes || '';
   uploadedDoc = e.doc || ''; openModal('modal-entretien');
 }
-function saveEntretien(e) {
+async function saveEntretien(e) {
   e.preventDefault();
   const v = DATA.vehicles.find(x => x.id === currentVehicleId); if (!v) return;
   if (!v.entretiens) v.entretiens = [];
@@ -1295,12 +1278,14 @@ function saveEntretien(e) {
     prix: parseFloat(document.getElementById('ef-prix').value) || null, notes: document.getElementById('ef-notes').value, doc: uploadedDoc };
   if (id) { const idx = v.entretiens.findIndex(x => x.id === id); if (idx >= 0) v.entretiens[idx] = obj; }
   else v.entretiens.push(obj);
-  saveData(); closeModal('modal-entretien'); renderVehicleEntretien(v);
+  await dbUpsert('entretiens', obj.id, obj, { vehicle_id: v.id });
+  closeModal('modal-entretien'); renderVehicleEntretien(v);
 }
-function deleteEntretien(eid) {
+async function deleteEntretien(eid) {
   const v = DATA.vehicles.find(x => x.id === currentVehicleId); if (!v) return;
   v.entretiens = (v.entretiens || []).filter(x => x.id !== eid);
-  saveData(); renderVehicleEntretien(v);
+  await dbDelete('entretiens', eid);
+  renderVehicleEntretien(v);
 }
 
 // ====== SUIVI FINANCIER ======
@@ -1654,7 +1639,7 @@ function openEditIncome(id) {
   openModal('modal-income');
 }
 
-function saveIncome(e) {
+async function saveIncome(e) {
   e.preventDefault();
   const id = document.getElementById('if-id').value;
   const obj = {
@@ -1672,12 +1657,14 @@ function saveIncome(e) {
   };
   if (id) { const idx = DATA.incomes.findIndex(x => x.id === id); if (idx >= 0) DATA.incomes[idx] = obj; }
   else DATA.incomes.push(obj);
-  saveData(); closeModal('modal-income'); renderFinancier();
+  await saveIncomeToDB(obj);
+  closeModal('modal-income'); renderFinancier();
 }
 
-function deleteIncome(id) {
+async function deleteIncome(id) {
   DATA.incomes = DATA.incomes.filter(x => x.id !== id);
-  saveData(); renderFinancier();
+  await dbDelete('incomes', id);
+  renderFinancier();
 }
 
 // Expense CRUD
@@ -1709,7 +1696,7 @@ function openEditExpense(id) {
   openModal('modal-expense');
 }
 
-function saveExpense(e) {
+async function saveExpense(e) {
   e.preventDefault();
   const id = document.getElementById('xf-id').value;
   const obj = {
@@ -1724,12 +1711,14 @@ function saveExpense(e) {
   };
   if (id) { const idx = DATA.expenses.findIndex(x => x.id === id); if (idx >= 0) DATA.expenses[idx] = obj; }
   else DATA.expenses.push(obj);
-  saveData(); closeModal('modal-expense'); renderFinancier();
+  await saveExpenseToDB(obj);
+  closeModal('modal-expense'); renderFinancier();
 }
 
-function deleteExpense(id) {
+async function deleteExpense(id) {
   DATA.expenses = DATA.expenses.filter(x => x.id !== id);
-  saveData(); renderFinancier();
+  await dbDelete('expenses', id);
+  renderFinancier();
 }
 
 // ====== CHECKLIST ======
@@ -1761,15 +1750,15 @@ function renderChecklistPage() {
     }).join('');
   }
 }
-function newChecklist() {
+async function newChecklist() {
   currentChecklistId = genId();
   const cl = { id: currentChecklistId, name: '', date: new Date().toISOString().split('T')[0], checks: {}, notes: {} };
   let idx = 0;
   CHECKLIST_TEMPLATE.sections.forEach(s => { s.items.forEach(() => { cl.checks['item_' + idx] = false; idx++; }); });
-  DATA.checklists.push(cl); saveData(); renderChecklistEditor();
+  DATA.checklists.push(cl); await saveChecklistToDB(cl); renderChecklistEditor();
 }
 function openSavedChecklist(id) { currentChecklistId = id; renderChecklistEditor(); }
-function deleteChecklist(id) { DATA.checklists = DATA.checklists.filter(x => x.id !== id); saveData(); renderChecklistPage(); }
+async function deleteChecklist(id) { DATA.checklists = DATA.checklists.filter(x => x.id !== id); await dbDelete('checklists', id); renderChecklistPage(); }
 function renderChecklistEditor() {
   const cl = DATA.checklists.find(x => x.id === currentChecklistId); if (!cl) return;
   document.getElementById('checklist-saved-list').innerHTML = '';
@@ -1791,11 +1780,11 @@ function renderChecklistEditor() {
 }
 function toggleChecklistItem(key) {
   const cl = DATA.checklists.find(x => x.id === currentChecklistId); if (!cl) return;
-  cl.checks[key] = !cl.checks[key]; saveData(); renderChecklistEditor();
+  cl.checks[key] = !cl.checks[key]; saveChecklistToDB(cl); renderChecklistEditor();
 }
 function saveChecklistNote(key, val) {
   const cl = DATA.checklists.find(x => x.id === currentChecklistId); if (!cl) return;
-  cl.notes[key] = val; saveData();
+  cl.notes[key] = val; saveChecklistToDB(cl);
 }
 function updateChecklistScore() {
   const cl = DATA.checklists.find(x => x.id === currentChecklistId); if (!cl) return;
@@ -1807,9 +1796,9 @@ function updateChecklistScore() {
   document.getElementById('checklist-score-bar').style.width = pct + '%';
   document.getElementById('checklist-score-bar').style.background = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
 }
-function saveChecklist() {
+async function saveChecklist() {
   const cl = DATA.checklists.find(x => x.id === currentChecklistId); if (!cl) return;
-  cl.name = document.getElementById('checklist-name').value || 'Sans nom'; saveData(); alert('Dossier sauvegarde !');
+  cl.name = document.getElementById('checklist-name').value || 'Sans nom'; await saveChecklistToDB(cl); alert('Dossier sauvegarde !');
 }
 function closeChecklist() { saveChecklist(); currentChecklistId = null; renderChecklistPage(); }
 function printChecklist() { window.print(); }
@@ -1843,7 +1832,7 @@ function dragCard(e, id) { draggedCardId = id; e.dataTransfer.effectAllowed = 'm
 function dropCard(e, colId) {
   e.preventDefault(); if (!draggedCardId) return;
   const card = DATA.pipeline.find(c => c.id === draggedCardId);
-  if (card) { card.etape = colId; saveData(); renderPipeline(); } draggedCardId = null;
+  if (card) { card.etape = colId; savePipelineToDB(card); renderPipeline(); } draggedCardId = null;
 }
 function openAddPipelineCard() {
   document.getElementById('modal-pipeline-title').textContent = 'Ajouter au pipeline';
@@ -1867,7 +1856,7 @@ function openEditPipelineCard(id) {
   document.getElementById('pf-notes').value = c.notes || '';
   openModal('modal-pipeline');
 }
-function savePipelineCard(e) {
+async function savePipelineCard(e) {
   e.preventDefault();
   const id = document.getElementById('pf-id').value;
   const obj = { id: id || genId(), modele: document.getElementById('pf-modele').value,
@@ -1879,7 +1868,7 @@ function savePipelineCard(e) {
     notes: document.getElementById('pf-notes').value };
   if (id) { const idx = DATA.pipeline.findIndex(x => x.id === id); if (idx >= 0) DATA.pipeline[idx] = obj; }
   else DATA.pipeline.push(obj);
-  saveData(); closeModal('modal-pipeline'); renderPipeline();
+  await savePipelineToDB(obj); closeModal('modal-pipeline'); renderPipeline();
 }
 
 // ====== MODAL HELPERS ======
@@ -1908,11 +1897,17 @@ function exportData() {
 function importData(e) {
   const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     try {
       const imported = JSON.parse(ev.target.result);
-      if (imported.vehicles) { DATA = imported; if (!DATA.incomes) DATA.incomes = []; if (!DATA.expenses) DATA.expenses = []; saveData(); navigate('dashboard'); alert('Import reussi !'); }
-      else alert('Fichier invalide');
+      if (imported.vehicles) {
+        DATA = imported;
+        if (!DATA.incomes) DATA.incomes = [];
+        if (!DATA.expenses) DATA.expenses = [];
+        await saveData();
+        navigate('dashboard');
+        alert('Import reussi !');
+      } else alert('Fichier invalide');
     } catch(err) { alert('Erreur de parsing JSON'); }
   };
   reader.readAsText(file); e.target.value = '';
@@ -1922,7 +1917,7 @@ function importData(e) {
 (async function init() {
   await loadData();
   renderDashboard();
-  console.log('ValGo CRM loaded — IndexedDB storage active');
+  console.log('ValGo CRM loaded — Supabase storage active');
 })();
 </script>
 </body>
