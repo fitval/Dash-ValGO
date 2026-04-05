@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root {
   --primary: #1D5C3B;
@@ -882,10 +881,15 @@ th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform
 </div>
 
 <script>
-// ====== DATA LAYER (Supabase) ======
-const SUPABASE_URL = 'https://wojjjjotdrzhuwoyjbuv.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indvampqam90ZHJ6aHV3b3lqYnV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMDQzNzcsImV4cCI6MjA5MDg4MDM3N30.-kbUQ4dinIEeUWjWR5IhPEFwZLN1sGCzPf8vLavO1cY';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ====== DATA LAYER (Supabase REST API) ======
+const SB_URL = 'https://wojjjjotdrzhuwoyjbuv.supabase.co/rest/v1';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indvampqam90ZHJ6aHV3b3lqYnV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMDQzNzcsImV4cCI6MjA5MDg4MDM3N30.-kbUQ4dinIEeUWjWR5IhPEFwZLN1sGCzPf8vLavO1cY';
+const SB_HEADERS = {
+  'apikey': SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY,
+  'Content-Type': 'application/json',
+  'Prefer': 'resolution=merge-duplicates'
+};
 
 let DATA = { vehicles: [], checklists: [], pipeline: [], incomes: [], expenses: [] };
 
@@ -896,22 +900,31 @@ function defaultEntretiens() {
 
 function genId() { return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
 
-// ---- Supabase CRUD helpers ----
+// ---- Supabase REST helpers ----
 async function dbLoad(table) {
-  const { data, error } = await supabase.from(table).select('*');
-  if (error) { console.error(`Load ${table}:`, error); return []; }
-  return data || [];
+  try {
+    const res = await fetch(SB_URL + '/' + table + '?select=*', { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } });
+    if (!res.ok) { console.error('Load ' + table + ':', res.status, await res.text()); return []; }
+    return await res.json();
+  } catch(e) { console.error('Load ' + table + ' failed:', e); return []; }
 }
 
-async function dbUpsert(table, id, data, extra) {
-  const row = { id, data, updated_at: new Date().toISOString(), ...extra };
-  const { error } = await supabase.from(table).upsert(row);
-  if (error) { console.error(`Upsert ${table}:`, error); alert('Erreur de sauvegarde: ' + error.message); }
+async function dbUpsert(table, row) {
+  try {
+    const res = await fetch(SB_URL + '/' + table, {
+      method: 'POST', headers: SB_HEADERS, body: JSON.stringify(row)
+    });
+    if (!res.ok) { const txt = await res.text(); console.error('Upsert ' + table + ':', res.status, txt); }
+  } catch(e) { console.error('Upsert ' + table + ' failed:', e); }
 }
 
 async function dbDelete(table, id) {
-  const { error } = await supabase.from(table).delete().eq('id', id);
-  if (error) { console.error(`Delete ${table}:`, error); }
+  try {
+    const res = await fetch(SB_URL + '/' + table + '?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE', headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+    });
+    if (!res.ok) { console.error('Delete ' + table + ':', res.status); }
+  } catch(e) { console.error('Delete ' + table + ' failed:', e); }
 }
 
 // ---- Load all data from Supabase ----
@@ -922,7 +935,6 @@ async function loadData() {
       dbLoad('expenses'), dbLoad('checklists'), dbLoad('pipeline')
     ]);
 
-    // Rebuild vehicles with their entretiens
     DATA.vehicles = vehicles.map(v => {
       const d = v.data;
       d.id = v.id;
@@ -949,39 +961,37 @@ async function loadData() {
       await saveVehicleToDB(defaultV);
     }
 
-    console.log('Supabase: loaded', DATA.vehicles.length, 'vehicles,', DATA.incomes.length, 'incomes,', DATA.expenses.length, 'expenses');
+    console.log('Supabase loaded:', DATA.vehicles.length, 'vehicles,', DATA.incomes.length, 'incomes,', DATA.expenses.length, 'expenses');
   } catch(e) {
     console.error('loadData failed:', e);
-    alert('Erreur de chargement Supabase. Verifiez votre connexion.');
   }
 }
 
 // ---- Save helpers per entity ----
 async function saveVehicleToDB(v) {
   const { entretiens, ...vData } = v;
-  await dbUpsert('vehicles', v.id, vData);
-  // Save entretiens
+  await dbUpsert('vehicles', { id: v.id, data: vData, updated_at: new Date().toISOString() });
   if (entretiens) {
     for (const e of entretiens) {
-      await dbUpsert('entretiens', e.id, e, { vehicle_id: v.id });
+      await dbUpsert('entretiens', { id: e.id, vehicle_id: v.id, data: e, updated_at: new Date().toISOString() });
     }
   }
 }
 
 async function saveIncomeToDB(i) {
-  await dbUpsert('incomes', i.id, i, { vehicle_id: i.vehicleId || null });
+  await dbUpsert('incomes', { id: i.id, vehicle_id: i.vehicleId || null, data: i, updated_at: new Date().toISOString() });
 }
 
 async function saveExpenseToDB(e) {
-  await dbUpsert('expenses', e.id, e, { vehicle_id: e.vehicleId || null });
+  await dbUpsert('expenses', { id: e.id, vehicle_id: e.vehicleId || null, data: e, updated_at: new Date().toISOString() });
 }
 
 async function saveChecklistToDB(c) {
-  await dbUpsert('checklists', c.id, c);
+  await dbUpsert('checklists', { id: c.id, data: c, updated_at: new Date().toISOString() });
 }
 
 async function savePipelineToDB(p) {
-  await dbUpsert('pipeline', p.id, p);
+  await dbUpsert('pipeline', { id: p.id, data: p, updated_at: new Date().toISOString() });
 }
 
 // Legacy saveData — now syncs full state (used by export/import)
