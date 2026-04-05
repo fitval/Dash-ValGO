@@ -391,6 +391,108 @@ th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform
   padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px;
   font-size: 13px; font-family: inherit; background: var(--bg); color: var(--text);
 }
+/* Inline spreadsheet table */
+.sheet-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.sheet-wrap table { margin: 0; }
+.sheet-wrap th {
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  user-select: none;
+}
+.sheet-wrap td {
+  padding: 0;
+  vertical-align: middle;
+  position: relative;
+}
+.sheet-wrap td.cell-editable {
+  cursor: text;
+}
+.sheet-wrap td.cell-editable:hover {
+  background: rgba(29,92,59,0.04);
+}
+.sheet-cell {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  min-height: 38px;
+  font-size: 13px;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+}
+.sheet-cell:focus {
+  background: rgba(29,92,59,0.06);
+  box-shadow: inset 0 0 0 2px var(--primary);
+  border-radius: 2px;
+}
+.sheet-cell[type="number"] { text-align: right; }
+.sheet-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.sheet-select:focus { box-shadow: inset 0 0 0 2px var(--primary); border-radius: 2px; }
+.sheet-select.s-fait { color: #166534; background: #dcfce7; border-radius: 12px; margin: 4px; padding: 4px 10px; width: auto; }
+.sheet-select.s-a_prevoir { color: #92400e; background: #fef3c7; border-radius: 12px; margin: 4px; padding: 4px 10px; width: auto; }
+.sheet-select.s-urgent { color: #991b1b; background: #fecaca; border-radius: 12px; margin: 4px; padding: 4px 10px; width: auto; }
+[data-theme="dark"] .sheet-select.s-fait { color: #86efac; background: #14532d; }
+[data-theme="dark"] .sheet-select.s-a_prevoir { color: #fcd34d; background: #78350f; }
+[data-theme="dark"] .sheet-select.s-urgent { color: #fca5a5; background: #7f1d1d; }
+.sheet-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  transition: all 0.15s;
+}
+.sheet-add-row:hover { color: var(--primary); background: rgba(29,92,59,0.04); }
+.sheet-del {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  transition: opacity 0.15s;
+}
+tr:hover .sheet-del { opacity: 1; }
+.sheet-doc-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: inherit;
+  margin: 4px;
+}
+.sheet-doc-btn:hover { border-color: var(--primary); color: var(--primary); }
+.sheet-doc-btn.has-doc { color: var(--info); border-color: var(--info); }
+
 /* Finance redesign */
 .fin-month-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -738,28 +840,6 @@ th { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform
   </div>
 </div>
 
-<!-- Modal Entretien -->
-<div class="modal-overlay" id="modal-entretien">
-  <div class="modal">
-    <h2 id="modal-entretien-title">Ajouter un entretien</h2>
-    <form id="entretien-form" onsubmit="saveEntretien(event)">
-      <input type="hidden" id="ef-id">
-      <div class="form-group"><label>Type d'entretien</label><select id="ef-type"><option>Pneus</option><option>Essuie-glaces</option><option>Courroie de distribution</option><option>Vidange</option><option>Freins</option><option>Filtres</option><option>CT</option><option>Embrayage</option><option>Courroie accessoires</option><option>Autre</option></select></div>
-      <div class="form-group"><label>Statut</label><select id="ef-statut"><option value="a_prevoir">A prevoir</option><option value="fait">Fait</option><option value="urgent">Urgent</option></select></div>
-      <div class="form-row">
-        <div class="form-group"><label>Date</label><input id="ef-date" type="date"></div>
-        <div class="form-group"><label>Km</label><input id="ef-km" type="number"></div>
-      </div>
-      <div class="form-group"><label>Prix (EUR)</label><input id="ef-prix" type="number" step="0.01"></div>
-      <div class="form-group"><label>Notes</label><textarea id="ef-notes"></textarea></div>
-      <div class="form-group"><label>Document (PDF)</label><input type="file" id="ef-doc" accept=".pdf" onchange="handleDocUpload(event)"></div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-entretien')">Annuler</button>
-        <button type="submit" class="btn btn-primary">Sauvegarder</button>
-      </div>
-    </form>
-  </div>
-</div>
 
 <!-- Modal Revenu (Income) -->
 <div class="modal-overlay" id="modal-income">
@@ -1158,33 +1238,109 @@ function renderVehicleInfo(v) {
 }
 
 function renderVehicleEntretien(v) {
-  const statusBadge = (s) => {
-    if (s === 'fait') return '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">Fait</span>';
-    if (s === 'urgent') return '<span style="background:#fecaca;color:#991b1b;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">Urgent</span>';
-    return '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">A prevoir</span>';
-  };
+  const entretienTypes = ['Pneus','Essuie-glaces','Courroie de distribution','Vidange','Freins','Filtres','CT','Embrayage','Courroie accessoires','Autre'];
+  const typeOptions = entretienTypes.map(t => `<option value="${t}">${t}</option>`).join('');
+
   document.getElementById('vtab-entretien').innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
-      <button class="btn btn-primary btn-sm" onclick="openAddEntretien()">+ Ajouter</button>
-    </div>
-    <table>
-      <thead><tr><th>Type</th><th>Statut</th><th>Date</th><th>Km</th><th>Prix</th><th>Notes</th><th></th></tr></thead>
-      <tbody>
-        ${(v.entretiens || []).map(e => `
-          <tr>
-            <td style="font-weight:500;">${e.type}</td>
-            <td>${statusBadge(e.statut)}</td>
-            <td>${e.date || '—'}</td>
-            <td>${e.km ? e.km.toLocaleString() : '—'}</td>
-            <td>${e.prix ? e.prix + ' EUR' : '—'}</td>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">${e.notes || '—'}</td>
-            <td>
-              <button class="btn btn-secondary btn-sm" onclick="openEditEntretien('${e.id}')" style="margin-right:4px;">Modifier</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteEntretien('${e.id}')">X</button>
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
+    <div class="sheet-wrap">
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:180px;">Type</th>
+              <th style="width:120px;">Statut</th>
+              <th style="width:120px;">Date</th>
+              <th style="width:100px;">Km</th>
+              <th style="width:100px;">Prix (EUR)</th>
+              <th>Notes</th>
+              <th style="width:70px;">Doc</th>
+              <th style="width:36px;"></th>
+            </tr>
+          </thead>
+          <tbody id="entretien-tbody">
+            ${(v.entretiens || []).map(e => entretienRowHTML(e)).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="sheet-add-row" onclick="addEntretienRow()">+ Ajouter une ligne</div>
+    </div>`;
+}
+
+function entretienRowHTML(e) {
+  const entretienTypes = ['Pneus','Essuie-glaces','Courroie de distribution','Vidange','Freins','Filtres','CT','Embrayage','Courroie accessoires','Autre'];
+  const typeOpts = entretienTypes.map(t => `<option value="${t}" ${e.type === t ? 'selected' : ''}>${t}</option>`).join('');
+  return `
+    <tr data-eid="${e.id}">
+      <td class="cell-editable">
+        <select class="sheet-select" onchange="updateEntretienField('${e.id}','type',this.value)">${typeOpts}</select>
+      </td>
+      <td>
+        <select class="sheet-select s-${e.statut || 'a_prevoir'}" onchange="updateEntretienField('${e.id}','statut',this.value);this.className='sheet-select s-'+this.value">
+          <option value="a_prevoir" ${e.statut === 'a_prevoir' ? 'selected' : ''}>A prevoir</option>
+          <option value="fait" ${e.statut === 'fait' ? 'selected' : ''}>Fait</option>
+          <option value="urgent" ${e.statut === 'urgent' ? 'selected' : ''}>Urgent</option>
+        </select>
+      </td>
+      <td class="cell-editable"><input class="sheet-cell" type="date" value="${e.date || ''}" onchange="updateEntretienField('${e.id}','date',this.value)"></td>
+      <td class="cell-editable"><input class="sheet-cell" type="number" placeholder="—" value="${e.km || ''}" onchange="updateEntretienField('${e.id}','km',parseInt(this.value)||null)"></td>
+      <td class="cell-editable"><input class="sheet-cell" type="number" step="0.01" placeholder="—" value="${e.prix || ''}" onchange="updateEntretienField('${e.id}','prix',parseFloat(this.value)||null)"></td>
+      <td class="cell-editable"><input class="sheet-cell" type="text" placeholder="Notes..." value="${(e.notes || '').replace(/"/g, '&quot;')}" onchange="updateEntretienField('${e.id}','notes',this.value)"></td>
+      <td><button class="sheet-doc-btn ${e.doc ? 'has-doc' : ''}" onclick="handleEntretienDoc('${e.id}')">${e.doc ? '&#128206; Voir' : '+ Doc'}</button>
+          <input type="file" id="doc-input-${e.id}" accept=".pdf,image/*" style="display:none" onchange="uploadEntretienDoc('${e.id}',event)">
+      </td>
+      <td><button class="sheet-del" onclick="deleteEntretien('${e.id}')" title="Supprimer">&#10005;</button></td>
+    </tr>`;
+}
+
+async function updateEntretienField(eid, field, value) {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId); if (!v) return;
+  const e = (v.entretiens || []).find(x => x.id === eid); if (!e) return;
+  e[field] = value;
+  await dbUpsert('entretiens', { id: e.id, vehicle_id: v.id, data: e, updated_at: new Date().toISOString() });
+}
+
+async function addEntretienRow() {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId); if (!v) return;
+  if (!v.entretiens) v.entretiens = [];
+  const newE = { id: genId(), type: 'Autre', statut: 'a_prevoir', date: '', km: null, prix: null, notes: '', doc: '' };
+  v.entretiens.push(newE);
+  await dbUpsert('entretiens', { id: newE.id, vehicle_id: v.id, data: newE, updated_at: new Date().toISOString() });
+  // Append row to DOM without full re-render
+  document.getElementById('entretien-tbody').insertAdjacentHTML('beforeend', entretienRowHTML(newE));
+  // Focus the type select of the new row
+  const lastRow = document.getElementById('entretien-tbody').lastElementChild;
+  if (lastRow) lastRow.querySelector('.sheet-select').focus();
+}
+
+function handleEntretienDoc(eid) {
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId); if (!v) return;
+  const e = (v.entretiens || []).find(x => x.id === eid); if (!e) return;
+  if (e.doc) {
+    // Show existing doc
+    const w = window.open();
+    if (e.doc.startsWith('data:application/pdf')) {
+      w.document.write('<iframe src="' + e.doc + '" style="width:100%;height:100%;border:none;"></iframe>');
+    } else {
+      w.document.write('<img src="' + e.doc + '" style="max-width:100%;">');
+    }
+  } else {
+    document.getElementById('doc-input-' + eid).click();
+  }
+}
+
+async function uploadEntretienDoc(eid, event) {
+  const file = event.target.files[0]; if (!file) return;
+  const v = DATA.vehicles.find(x => x.id === currentVehicleId); if (!v) return;
+  const e = (v.entretiens || []).find(x => x.id === eid); if (!e) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    e.doc = ev.target.result;
+    await dbUpsert('entretiens', { id: e.id, vehicle_id: v.id, data: e, updated_at: new Date().toISOString() });
+    // Update the button
+    const btn = document.querySelector(`tr[data-eid="${eid}"] .sheet-doc-btn`);
+    if (btn) { btn.classList.add('has-doc'); btn.innerHTML = '&#128206; Voir'; }
+  };
+  reader.readAsDataURL(file);
 }
 
 // ====== VEHICLE CRUD ======
@@ -1257,45 +1413,14 @@ async function deleteCurrentVehicle() {
   navigate('vehicles');
 }
 
-// ====== ENTRETIEN CRUD ======
-let uploadedDoc = '';
-function handleDocUpload(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader(); reader.onload = (ev) => { uploadedDoc = ev.target.result; }; reader.readAsDataURL(file);
-}
-function openAddEntretien() {
-  document.getElementById('modal-entretien-title').textContent = 'Ajouter un entretien';
-  document.getElementById('entretien-form').reset(); document.getElementById('ef-id').value = '';
-  uploadedDoc = ''; openModal('modal-entretien');
-}
-function openEditEntretien(eid) {
-  const v = DATA.vehicles.find(x => x.id === currentVehicleId);
-  const e = (v.entretiens || []).find(x => x.id === eid); if (!e) return;
-  document.getElementById('modal-entretien-title').textContent = 'Modifier entretien';
-  document.getElementById('ef-id').value = e.id;
-  document.getElementById('ef-type').value = e.type; document.getElementById('ef-statut').value = e.statut;
-  document.getElementById('ef-date').value = e.date || ''; document.getElementById('ef-km').value = e.km || '';
-  document.getElementById('ef-prix').value = e.prix || ''; document.getElementById('ef-notes').value = e.notes || '';
-  uploadedDoc = e.doc || ''; openModal('modal-entretien');
-}
-async function saveEntretien(e) {
-  e.preventDefault();
-  const v = DATA.vehicles.find(x => x.id === currentVehicleId); if (!v) return;
-  if (!v.entretiens) v.entretiens = [];
-  const id = document.getElementById('ef-id').value;
-  const obj = { id: id || genId(), type: document.getElementById('ef-type').value, statut: document.getElementById('ef-statut').value,
-    date: document.getElementById('ef-date').value, km: parseInt(document.getElementById('ef-km').value) || null,
-    prix: parseFloat(document.getElementById('ef-prix').value) || null, notes: document.getElementById('ef-notes').value, doc: uploadedDoc };
-  if (id) { const idx = v.entretiens.findIndex(x => x.id === id); if (idx >= 0) v.entretiens[idx] = obj; }
-  else v.entretiens.push(obj);
-  await dbUpsert('entretiens', obj.id, obj, { vehicle_id: v.id });
-  closeModal('modal-entretien'); renderVehicleEntretien(v);
-}
+// ====== ENTRETIEN (inline editing — see renderVehicleEntretien above) ======
 async function deleteEntretien(eid) {
   const v = DATA.vehicles.find(x => x.id === currentVehicleId); if (!v) return;
   v.entretiens = (v.entretiens || []).filter(x => x.id !== eid);
   await dbDelete('entretiens', eid);
-  renderVehicleEntretien(v);
+  // Remove row from DOM
+  const row = document.querySelector(`tr[data-eid="${eid}"]`);
+  if (row) row.remove();
 }
 
 // ====== SUIVI FINANCIER ======
