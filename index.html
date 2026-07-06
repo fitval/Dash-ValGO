@@ -962,8 +962,8 @@ tr:hover .sheet-del { opacity: 1; }
 
 <script>
 // ====== DATA LAYER (Supabase REST API) ======
-const SB_URL = 'https://wojjjjotdrzhuwoyjbuv.supabase.co/rest/v1';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indvampqam90ZHJ6aHV3b3lqYnV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMDQzNzcsImV4cCI6MjA5MDg4MDM3N30.-kbUQ4dinIEeUWjWR5IhPEFwZLN1sGCzPf8vLavO1cY';
+const SB_URL = 'https://iujgeubixwzmmcuxrhfs.supabase.co/rest/v1';
+const SB_KEY = 'sb_publishable_D2nSUsiniVxuU-p7ERpz2w_ATJ8Y0Ha';
 const SB_HEADERS = {
   'apikey': SB_KEY,
   'Authorization': 'Bearer ' + SB_KEY,
@@ -2049,7 +2049,39 @@ function importData(e) {
 }
 
 // ====== INIT ======
+// ==== Migration unique : récupère les données locales (valgo_crm) vers Supabase ====
+async function migrateLocalToSupabase() {
+  if (localStorage.getItem('valgo_migrated_v2') === 'done') return;
+  const raw = localStorage.getItem('valgo_crm');
+  if (!raw) { localStorage.setItem('valgo_migrated_v2', 'done'); return; }
+
+  let D;
+  try { D = JSON.parse(raw); } catch(e) { console.error('valgo_crm illisible', e); return; }
+
+  const now = () => new Date().toISOString();
+  const gid = () => 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const c = { vehicles: 0, entretiens: 0, incomes: 0, expenses: 0, checklists: 0, pipeline: 0 };
+
+  for (const v of (D.vehicles || [])) {
+    const vData = Object.assign({}, v); delete vData.entretiens;
+    const id = v.id || gid();
+    await dbUpsert('vehicles', { id, data: vData, updated_at: now() }); c.vehicles++;
+    for (const e of (v.entretiens || [])) {
+      await dbUpsert('entretiens', { id: e.id || gid(), vehicle_id: id, data: e, updated_at: now() }); c.entretiens++;
+    }
+  }
+  for (const i of (D.incomes || []))    { await dbUpsert('incomes',    { id: i.id || gid(), vehicle_id: i.vehicleId || null, data: i, updated_at: now() }); c.incomes++; }
+  for (const x of (D.expenses || []))   { await dbUpsert('expenses',   { id: x.id || gid(), vehicle_id: x.vehicleId || null, data: x, updated_at: now() }); c.expenses++; }
+  for (const ck of (D.checklists || [])){ await dbUpsert('checklists', { id: ck.id || gid(), data: ck, updated_at: now() }); c.checklists++; }
+  for (const p of (D.pipeline || []))   { await dbUpsert('pipeline',   { id: p.id || gid(), data: p, updated_at: now() }); c.pipeline++; }
+
+  localStorage.setItem('valgo_migrated_v2', 'done');
+  console.log('Migration valgo_crm -> Supabase terminee', c);
+  alert('Recuperation terminee !\n\nVehicules : ' + c.vehicles + '\nRevenus : ' + c.incomes + '\nDepenses : ' + c.expenses + '\nEntretiens : ' + c.entretiens + '\nChecklists : ' + c.checklists + '\nPipeline : ' + c.pipeline + '\n\nTes donnees sont de retour.');
+}
+
 (async function init() {
+  await migrateLocalToSupabase();
   await loadData();
   renderDashboard();
   console.log('ValGo CRM loaded — Supabase storage active');
