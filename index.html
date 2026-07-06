@@ -2080,10 +2080,40 @@ async function migrateLocalToSupabase() {
   alert('Recuperation terminee !\n\nVehicules : ' + c.vehicles + '\nRevenus : ' + c.incomes + '\nDepenses : ' + c.expenses + '\nEntretiens : ' + c.entretiens + '\nChecklists : ' + c.checklists + '\nPipeline : ' + c.pipeline + '\n\nTes donnees sont de retour.');
 }
 
+// ==== Sauvegarde mensuelle automatique (le 15 de chaque mois) ====
+function autoMonthlyBackup() {
+  try {
+    const now = new Date();
+    if (now.getDate() < 15) return; // avant le 15 : rien
+    const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    if (localStorage.getItem('valgo_last_backup_month') === monthKey) return; // déjà fait ce mois-ci
+
+    const json = JSON.stringify(DATA, null, 2);
+
+    // 1) Copie de secours dans le navigateur (dernier instantané)
+    try { localStorage.setItem('valgo_backup_last', json); } catch(e) {}
+
+    // 2) Téléchargement d'un fichier de sauvegarde sur l'ordinateur
+    const dateStr = now.toISOString().split('T')[0];
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'valgo_sauvegarde_' + dateStr + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+
+    localStorage.setItem('valgo_last_backup_month', monthKey);
+    setTimeout(function () {
+      alert('Sauvegarde mensuelle du ' + dateStr + ' telechargee.\n\nVerifie ton dossier Telechargements et garde ce fichier precieusement (en cas de pepin, on pourra tout restaurer avec le bouton Import JSON).');
+    }, 800);
+  } catch(e) { console.error('Sauvegarde mensuelle echouee', e); }
+}
+
 (async function init() {
   await migrateLocalToSupabase();
   await loadData();
   renderDashboard();
+  autoMonthlyBackup();
   console.log('ValGo CRM loaded — Supabase storage active');
 })();
 </script>
